@@ -18,4 +18,7 @@ def insert_ip_data(file_path):
         print(ip, mask, traffic_oam, location, device)
 
 if __name__ == "__main__":
-    insert_ip_data(file_path)
+    # insert_ip_data(file_path)
+    res = IPDB.objects.all()
+    for i in res:
+        print(i.device)

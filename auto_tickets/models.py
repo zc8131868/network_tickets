@@ -18,12 +18,12 @@ class IPDB(models.Model):
     device = models.CharField(max_length=100, unique=False, verbose_name='device')
 
     def __str__(self):
-        return f"{self.__class__.__name__}(ip: {self.ip} | mask: {self.subnet})"
+        return f"{self.__class__.__name__}(ip: {self.ip} | mask: {self.mask})"
 
     def ip_dict(self):
         return {'id': self.id,
                 'ip': self.ip,
-                'mask': self.subnet,
+                'mask': self.mask,
                 'traffic_oam': self.traffic_oam,
                 'location': self.location,
                 'device': self.device,

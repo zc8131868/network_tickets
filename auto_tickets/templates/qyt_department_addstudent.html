@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    {# 为了在Form中添加必选项的星,需要添加的css #}
+    <style type="text/css">
+    label.required::before {
+        content: "*";
+        color: red;
+    }
+    </style>
+{% endblock head %}
+
+{% block title %}
+    Tickets Split
+{% endblock title %}
+
+{% block body %}
+    <div class="container-fluid">
+        <br><h2 style="color: #666666">Please input the IP information</h2>
+        {# 导入居家必备三条信息, success error warning #}
+        {% include "qyt_department_3_message.html" %}
+        <form action="" method="post" class="row g-3">
+            {% csrf_token %}
+            <div class="col-12">
+                {{ form }}
+                <br>
+                {{ result }}
+            </div>
+            <br>
+            <div class="col-md-12">
+            <input class="btn btn-primary btn-lg" type='submit' value='Submit'>
+            </div>  
+        </form>
+    </div>
+{% endblock body %}
