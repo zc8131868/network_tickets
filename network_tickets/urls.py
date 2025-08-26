@@ -19,11 +19,12 @@ from django.urls import path
 from views.index import index
 from auto_tickets.views.qyt_department_view_summary import show_ipdb
 from auto_tickets.views.qyt_department_addstudent import single_split
+from auto_tickets.views.multi_split import multi_split
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', index, name='index'),
     path('ipdb/', show_ipdb, name='show_ipdb'),
     path('single_split/', single_split, name='single_split'),
-    # path('multi_split/', multi_split, name='multi_split'),
+    path('multi_split/', multi_split, name='multi_split'),
 ]

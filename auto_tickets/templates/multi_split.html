@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    {# 为了在Form中添加必选项的星,需要添加的css #}
+    <style type="text/css">
+    label.required::before {
+        content: "*";
+        color: red;
+    }
+    </style>
+{% endblock head %}
+
+{% block title %}
+    Tickets Split
+{% endblock title %}
+
+{% block body %}
+    <div class="input-group mb-3">
+        <label class="input-group-text" for="inputGroupFile01">Upload</label>
+        <input type="file" class="form-control" id="inputGroupFile01">
+    </div>
+{% endblock body %}
