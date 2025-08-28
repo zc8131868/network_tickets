@@ -7,7 +7,7 @@ from auto_tickets.models import IPDB
 
 
 
-file_path = '/network_tickets/auto_tickets/route_statistic.xlsx'
+file_path = '/it_network/network_tickets/auto_tickets/route_statistic.xlsx'
 
 def insert_ip_data(file_path):
     workbook = openpyxl.load_workbook(file_path)
@@ -18,7 +18,7 @@ def insert_ip_data(file_path):
         print(ip, mask, traffic_oam, location, device)
 
 if __name__ == "__main__":
-    # insert_ip_data(file_path)
+    insert_ip_data(file_path)
     res = IPDB.objects.all()
     for i in res:
         print(i.device)

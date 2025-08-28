@@ -45,103 +45,103 @@ def tickets_split(source_ip, destination_ip):
         return 'Unknown IP. Please report to IT, thank you.'
      #NewPrivateCloud to South Base
     if source_location == 'NewPrivateCloud' and destination_location == 'South Base':   
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to South Base. Tickets contain: \n 1) ITSR \n 2)EOMS-Cloud \n 3)South Base (IT will provide support)'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to South Base. Tickets contain: \n 1) ITSR \n 2)EOMS-Cloud \n 3)South Base (IT will provide support)'
     #PrivateCloud to South Base
     elif source_location == 'PrivateCloud' and destination_location == 'South Base':    
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to South Base. Tickets contain: \n 1) ITSR \n 2)EOMS-Cloud \n 3)South Base (IT will provide support)'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to South Base. Tickets contain: \n 1) ITSR \n 2)EOMS-Cloud \n 3)South Base (IT will provide support)'
     #PrivateCloud-GNC to South Base
     elif source_location == 'PrivateCloud-GNC' and destination_location == 'South Base':    
-        return f'Source IP belongs to Private Cloud GNC, Destination IP belongs to South Base. Tickets contain: \n 1) ITSR \n 2)EOMS-Cloud \n 3)South Base (IT will provide support)'
+        return f'{source_ip} belongs to Private Cloud GNC, {destination_ip} belongs to South Base. Tickets contain: \n 1) ITSR \n 2)EOMS-Cloud \n 3)South Base (IT will provide support)'
     #PrivateCloud to PrivateCloud
     elif source_location == 'PrivateCloud' and destination_location == 'PrivateCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
     #NewPrivateCloud to NewPrivateCloud
     elif source_location == 'NewPrivateCloud' and destination_location == 'NewPrivateCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
     #PrivateCloud to NewPrivateCloud
     elif source_location == 'PrivateCloud' and destination_location == 'NewPrivateCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
     #NewPrivateCloud to PrivateCloud 
     elif source_location == 'NewPrivateCloud' and destination_location == 'PrivateCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
     #NewPrivateCloud to PrivateCloud-GNC
     elif source_location == 'NewPrivateCloud' and destination_location == 'PrivateCloud-GNC':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     #PrivateCloud-GNC to NewPrivateCloud
     elif source_location == 'PrivateCloud-GNC' and destination_location == 'NewPrivateCloud':
-        return f'Source IP belongs to Private Cloud GNC, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+        return f'{source_ip} belongs to Private Cloud GNC, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     #PrivateCloud to PrivateCloud-GNC
     elif source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-GNC':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     #PrivateCloud-GNC to PrivateCloud
     elif source_location == 'PrivateCloud-GNC' and destination_location == 'PrivateCloud':
-        return f'Source IP belongs to Private Cloud GNC, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+        return f'{source_ip} belongs to Private Cloud GNC, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     #PrivateCloud-GNC to PrivateCloud-GNC
     elif source_location == 'PrivateCloud-GNC' and destination_location == 'PrivateCloud-GNC':
-        return f'Source IP belongs to Private Cloud GNC, Destination IP belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud'
+        return f'{source_ip} belongs to Private Cloud GNC, {destination_ip} belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud'
     #NewPrivateCloud to SN OAM
     elif source_location == 'NewPrivateCloud' and destination_location == 'SN OAM':
-            return f'Source IP belongs to Private Cloud, Destination IP belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #PrivateCloud to SN OAM
     elif source_location == 'PrivateCloud' and destination_location == 'SN OAM':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #PrivateCloud-GNC to SN OAM
     elif source_location == 'PrivateCloud-GNC' and destination_location == 'SN OAM':
-        return f'Source IP belongs to Private Cloud GNC, Destination IP belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+        return f'{source_ip} belongs to Private Cloud GNC, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #SN OAM to NewPrivateCloud
     elif source_location == 'SN OAM' and destination_location == 'NewPrivateCloud':
-        return f'Source IP belongs to SN OAM, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+        return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #SN OAM to PrivateCloud
     elif source_location == 'SN OAM' and destination_location == 'PrivateCloud':
-        return f'Source IP belongs to SN OAM, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+        return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #SN OAM to PrivateCloud-GNC
     elif source_location == 'SN OAM' and destination_location == 'PrivateCloud-GNC':
-        return f'Source IP belongs to SN OAM, Destination IP belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+        return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #NewPrivateCloud to SN PCloud
     elif source_location == 'NewPrivateCloud' and destination_location == 'SN PCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
     #PrivateCloud to SN PCloud
     elif source_location == 'PrivateCloud' and destination_location == 'SN PCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
     #PrivateCloud-GNC to SN PCloud
     elif source_location == 'PrivateCloud-GNC' and destination_location == 'SN PCloud':
-        return f'Source IP belongs to Private Cloud GNC, Destination IP belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+        return f'{source_ip} belongs to Private Cloud GNC, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #SN PCloud to NewPrivateCloud
     elif source_location == 'SN PCloud' and destination_location == 'NewPrivateCloud':
-        return f'Source IP belongs to SN PCloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
+        return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
     #SN PCloud to PrivateCloud
     elif source_location == 'SN PCloud' and destination_location == 'PrivateCloud':
-        return f'Source IP belongs to SN PCloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
+        return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
     #SN PCloud to PrivateCloud-GNC
     elif source_location == 'SN PCloud' and destination_location == 'PrivateCloud-GNC':
-        return f'Source IP belongs to SN PCloud, Destination IP belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+        return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
     #NewPrivateCloud to AliCloud
     elif source_location == 'NewPrivateCloud' and destination_location == 'AliCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
     #PrivateCloud to AliCloud
     elif source_location == 'PrivateCloud' and destination_location == 'AliCloud':
-        return f'Source IP belongs to Private Cloud, Destination IP belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
     #PrivateCloud-GNC to AliCloud
     elif source_location == 'PrivateCloud-GNC' and destination_location == 'AliCloud':
-        return f'Source IP belongs to Private Cloud GNC, Destination IP belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR \n 3)EOMS-SN \n 4)AliCloud'
+        return f'{source_ip} belongs to Private Cloud GNC, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR \n 3)EOMS-SN \n 4)AliCloud'
     #SN PCloud to AliCloud
     elif source_location == 'SN PCloud' and destination_location == 'AliCloud':
-        return f'Source IP belongs to SN PCloud, Destination IP belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
     #AliCloud to NewPrivateCloud
     elif source_location == 'AliCloud' and destination_location == 'NewPrivateCloud':
-        return f'Source IP belongs to AliCloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
     #AliCloud to PrivateCloud
     elif source_location == 'AliCloud' and destination_location == 'PrivateCloud':
-        return f'Source IP belongs to AliCloud, Destination IP belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
     #AliCloud to PrivateCloud-GNC
     elif source_location == 'AliCloud' and destination_location == 'PrivateCloud-GNC':
-        return f'Source IP belongs to AliCloud, Destination IP belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR \n 3)EOMS-SN \n 4)AliCloud'
+        return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to Private Cloud GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR \n 3)EOMS-SN \n 4)AliCloud'
     #AliCloud to SN PCloud
     elif source_location == 'AliCloud' and destination_location == 'SN PCloud':
-        return f'Source IP belongs to AliCloud, Destination IP belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
     #AliCloud to SN OAM
     elif source_location == 'AliCloud' and destination_location == 'SN OAM':
-        return f'Source IP belongs to AliCloud, Destination IP belongs to SN OAM. Tickets contain: 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to SN OAM. Tickets contain: 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
     else:
         return 'Unknown IP. Please report to IT, thank you.'
 

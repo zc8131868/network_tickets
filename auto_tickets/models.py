@@ -130,3 +130,12 @@ class IPDB(models.Model):
     #         f"| Direction: {self.department.department_name} " \
     #         f"| Email: {self.mail} " \
     #         f"| Phone: {self.phone_number})"
+
+
+class DownloadFile(models.Model):
+    title = models.CharField(max_length=100, unique=True, verbose_name='title')
+    file = models.FileField(upload_to='download_files/', verbose_name='file')
+    create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(title: {self.title})"

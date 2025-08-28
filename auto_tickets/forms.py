@@ -45,6 +45,9 @@ class IPDBFORM(forms.Form):
                                'class': "form-control",
                                'placeholder': "please input ip prefix like 192.168.1.1"
                                }))
+    
+    # file = forms.FileField(label='Excel File', required=True)
+    
     # mask = forms.CharField(validators=[ip_regex],
     #                         max_length=15,
     #                         min_length=7,

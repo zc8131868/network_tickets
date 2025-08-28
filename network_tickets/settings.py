@@ -81,7 +81,7 @@ DATABASES = {
         'NAME': 'auto_tickets',
         'USER': 'zc',
         'PASSWORD': 'zc8131868',
-        'HOST': '10.10.1.100',
+        'HOST': 'localhost',
         'PORT': '3306',
     }
 }
@@ -122,9 +122,16 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS=[
     os.path.join(BASE_DIR, 'static'),
 ]
+
+# 媒体文件根目录
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# 媒体文件URL前缀
+MEDIA_URL = '/media/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

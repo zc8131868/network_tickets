@@ -2,34 +2,138 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    IP database
+    IP Database - Network Management
 {% endblock title %}
 
 {% block body %}
-<div class="container-fluid">
-    <h1>{{ qytsummary }}</h1>
-    <!-- {% if mytime is 6 or mytime is 0 %}
-    <p style="color: green"><strong>今天是周末</strong></p>
-    {% elif mytime > 3 %}
-    <p style="color: green"><strong>周三已经过去,周末快到了</strong></p>
-    {% else %}
-    <p style="color: green"><strong>今天不是周末</strong></p>
-    {% endif %} -->
-  
-    <p style="color: red">IP address</p>
-        <ol>
-            {% for ip, mask in ipmask %}
-            <li>
-                <span>{{ ip }}</span> - <span>{{mask}}</span>
-            </li>
-            {% endfor %}
-        </ol>
-    <!-- <p style="color: red">讲师</p>
-        <ul>
-            {% for t in teacher_list %}
-            <li>部门:{{ t.depart }} 讲师:{{ t.teacher }}</li>
-            {% endfor %}
-        </ul> -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1><i class="fas fa-database me-3"></i>IP Database</h1>
+                <p class="lead">Comprehensive view of your network IP addresses and subnet information</p>
+            </div>
+            <div class="col-lg-4 text-end">
+                <div class="stats-card">
+                    <div class="stats-number">{{ ipmask|length }}</div>
+                    <div>IP Addresses</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-list me-2"></i>Network IP Addresses</h4>
+                </div>
+                <div class="card-body">
+                    {% if ipmask %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th><i class="fas fa-hashtag me-2"></i>#</th>
+                                        <th><i class="fas fa-network-wired me-2"></i>IP Address</th>
+                                        <th><i class="fas fa-mask me-2"></i>Subnet Mask</th>
+                                        <th><i class="fas fa-info-circle me-2"></i>Network Info</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for ip, mask in ipmask %}
+                                    <tr>
+                                        <td class="fw-bold">{{ forloop.counter }}</td>
+                                        <td>
+                                            <span class="badge bg-primary fs-6">{{ ip }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary fs-6">{{ mask }}</span>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                <i class="fas fa-globe me-1"></i>
+                                                Network: {{ ip }}/{{ mask }}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Summary Cards -->
+                        <div class="row mt-4">
+                            <div class="col-md-4">
+                                <div class="card bg-primary bg-opacity-10 border-primary">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-network-wired text-primary fs-1 mb-3"></i>
+                                        <h5 class="text-primary">{{ ipmask|length }}</h5>
+                                        <p class="text-muted mb-0">Total IP Addresses</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-success bg-opacity-10 border-success">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-check-circle text-success fs-1 mb-3"></i>
+                                        <h5 class="text-success">Active</h5>
+                                        <p class="text-muted mb-0">Network Status</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info bg-opacity-10 border-info">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-shield-alt text-info fs-1 mb-3"></i>
+                                        <h5 class="text-info">Secure</h5>
+                                        <p class="text-muted mb-0">Data Protection</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-database text-muted" style="font-size: 4rem;"></i>
+                            <h4 class="text-muted mt-3">No IP Addresses Found</h4>
+                            <p class="text-muted">The IP database is currently empty. Please add some IP addresses to get started.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-bolt me-2"></i>Quick Actions</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <a href="/single_split/" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-user me-2"></i>Single Split
+                            </a>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <a href="/multi_split/" class="btn btn-outline-success w-100">
+                                <i class="fas fa-users me-2"></i>Multi Split
+                            </a>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <a href="/" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-home me-2"></i>Back to Home
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock body %}

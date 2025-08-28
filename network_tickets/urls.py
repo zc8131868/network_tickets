@@ -16,10 +16,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from views.index import index
 from auto_tickets.views.qyt_department_view_summary import show_ipdb
 from auto_tickets.views.qyt_department_addstudent import single_split
 from auto_tickets.views.multi_split import multi_split
+from auto_tickets.views.download_ITSRsample import download_ITSRsample
+
+
+
+
+
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,4 +36,11 @@ urlpatterns = [
     path('ipdb/', show_ipdb, name='show_ipdb'),
     path('single_split/', single_split, name='single_split'),
     path('multi_split/', multi_split, name='multi_split'),
+    path('download_sample/', download_ITSRsample, name='download_sample'),
 ]
+
+
+# Serve static and media files during development
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
