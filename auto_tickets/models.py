@@ -139,3 +139,14 @@ class DownloadFile(models.Model):
 
     def __str__(self):
         return f"{self.__class__.__name__}(title: {self.title})"
+
+
+class IP_Application(models.Model):
+    location = models.CharField(max_length=100, unique=False, verbose_name='location')
+    usage = models.CharField(max_length=100, unique=False, default='Traffic', verbose_name='Application Usage')
+    number = models.IntegerField(default=6, verbose_name='Number of IPs')
+    subnet = models.CharField(max_length=100, unique=True, default='', verbose_name='subnet')
+    create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(location: {self.location} | usage: {self.usage} | number: {self.number} | subnet: {self.subnet})"

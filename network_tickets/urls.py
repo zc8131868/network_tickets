@@ -23,7 +23,7 @@ from auto_tickets.views.qyt_department_view_summary import show_ipdb
 from auto_tickets.views.qyt_department_addstudent import single_split
 from auto_tickets.views.multi_split import multi_split
 from auto_tickets.views.download_ITSRsample import download_ITSRsample
-
+from auto_tickets.views.ip_application import ip_application
 
 
 
@@ -33,7 +33,8 @@ from auto_tickets.views.download_ITSRsample import download_ITSRsample
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', index, name='index'),
-    path('ipdb/', show_ipdb, name='show_ipdb'),
+    # path('ipdb/', show_ipdb, name='show_ipdb'),
+    path('ip_application/', ip_application, name='ip_application'),
     path('single_split/', single_split, name='single_split'),
     path('multi_split/', multi_split, name='multi_split'),
     path('download_sample/', download_ITSRsample, name='download_sample'),
