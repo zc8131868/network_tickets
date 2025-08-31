@@ -44,4 +44,13 @@ class IPApplicationForm(forms.Form):
             'class': 'form-select',
         })
     )
+
+    # deleted_ip = forms.CharField(
+    #     label='Deleted IP',
+    #     required=False,
+    #     initial='e.g. 192.168.1.1/24',
+    #     widget=forms.TextInput(attrs={
+    #         'class': 'form-control',
+    #     })
+    # )
     

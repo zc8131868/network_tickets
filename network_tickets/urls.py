@@ -24,7 +24,8 @@ from auto_tickets.views.qyt_department_addstudent import single_split
 from auto_tickets.views.multi_split import multi_split
 from auto_tickets.views.download_ITSRsample import download_ITSRsample
 from auto_tickets.views.ip_application import ip_application
-
+from auto_tickets.views.ip_deletion import ip_deletion
+from auto_tickets.views.login import login_view, logout_view
 
 
 
@@ -35,9 +36,12 @@ urlpatterns = [
     path('', index, name='index'),
     # path('ipdb/', show_ipdb, name='show_ipdb'),
     path('ip_application/', ip_application, name='ip_application'),
+    path('ip_deletion/', ip_deletion, name='ip_deletion'),
     path('single_split/', single_split, name='single_split'),
     path('multi_split/', multi_split, name='multi_split'),
     path('download_sample/', download_ITSRsample, name='download_sample'),
+    path('accounts/login/', login_view, name='login'),
+    path('accounts/logout/', logout_view, name='logout'),
 ]
 
 

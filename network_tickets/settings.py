@@ -56,8 +56,7 @@ ROOT_URLCONF = 'network_tickets.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates']
-        ,
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -111,6 +110,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
+
+
 TIME_ZONE = 'UTC'
 
 USE_I18N = True
@@ -129,6 +130,11 @@ STATICFILES_DIRS=[
 
 # 媒体文件根目录
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Authentication settings
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
 
 # 媒体文件URL前缀
 MEDIA_URL = '/media/'

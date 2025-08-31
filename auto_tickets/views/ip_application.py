@@ -3,7 +3,9 @@ from auto_tickets.tools import generate_subnet
 from auto_tickets.views.forms_ipapplication import IPApplicationForm
 from auto_tickets.models import IP_Application
 import ipaddress
+from django.contrib.auth.decorators import login_required
 
+@login_required
 def ip_application(request):
     '''
     MITA 10.1.96.0/19     Traffic
@@ -22,7 +24,7 @@ def ip_application(request):
             location = form.cleaned_data['location']
             usage = form.cleaned_data['usage']
             number = form.cleaned_data['number']
-
+           
             if location == 'MITA':
                 if usage == 'Traffic':
                     parent_network = f'10.1.96.0/19'
@@ -51,10 +53,13 @@ def ip_application(request):
 
             if subnet:
                 IP_Application.objects.create(location=location, usage=usage, number=int(number), subnet=str(subnet))
-                form = IPApplicationForm()  # Create fresh form
+                form = IPApplicationForm()  # Create fresh form with initial data
                 return render(request, 'ip_application.html', {'form': form, 'subnet': subnet})
             else:
                 return render(request, 'ip_application.html', {'form': form, 'error': 'Generate subnet failed'})
+        else:
+            # Form is not valid, return the form with errors
+            return render(request, 'ip_application.html', {'form': form})
     else:
         form = IPApplicationForm()
         return render(request, 'ip_application.html', {'form': form})
