@@ -1,0 +1,469 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    <style type="text/css">
+    /* Enhanced Security Tools Styling */
+    .security-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+    
+    .security-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        color: white;
+        padding: 4rem 0;
+        margin-bottom: 3rem;
+        border-radius: 0 0 3rem 3rem;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+    }
+    
+    .security-header h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .security-header p {
+        font-size: 1.4rem;
+        opacity: 0.95;
+        margin: 0;
+        font-weight: 500;
+    }
+    
+    .security-form-card {
+        background: white;
+        border-radius: 2rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        padding: 3rem;
+        margin-bottom: 2rem;
+        border: none;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .security-form-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(90deg, #3b82f6, #1e40af, #1d4ed8, #2563eb);
+    }
+    
+    .security-form-card .card-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        color: white;
+        border: none;
+        padding: 2rem 3rem;
+        margin: -3rem -3rem 2rem -3rem;
+        border-radius: 2rem 2rem 0 0;
+        font-size: 1.8rem;
+        font-weight: 700;
+        text-align: center;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+    }
+    
+    .form-row {
+        margin-bottom: 2rem;
+    }
+    
+    .form-label {
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .form-label i {
+        color: #3b82f6;
+        margin-right: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .form-control {
+        border-radius: 1.5rem;
+        border: 3px solid #e5e7eb;
+        padding: 1.25rem 1.5rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        background-color: #f9fafb;
+        font-weight: 500;
+    }
+    
+    .form-control:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 0.4rem rgba(59, 130, 246, 0.15);
+        background-color: white;
+        transform: translateY(-2px);
+    }
+    
+    .btn-security {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        border: none;
+        border-radius: 1.5rem;
+        padding: 1.25rem 3rem;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: white;
+        transition: all 0.3s ease;
+        box-shadow: 0 12px 25px rgba(59, 130, 246, 0.3);
+        margin-top: 1.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-security:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 16px 35px rgba(59, 130, 246, 0.4);
+        color: white;
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
+    }
+    
+    .security-result-card {
+        background: white;
+        border-radius: 2rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        padding: 3rem;
+        margin-top: 2rem;
+        border: none;
+        animation: slideInUp 0.8s ease-out;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .security-result-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(90deg, #059669, #10b981, #34d399, #6ee7b7);
+    }
+    
+    .security-result-card.success {
+        border-left: 8px solid #10b981;
+    }
+    
+    .security-result-card.error {
+        border-left: 8px solid #ef4444;
+    }
+    
+    .security-result-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 2rem;
+        font-size: 1.6rem;
+        font-weight: 700;
+        padding: 1.5rem;
+        border-radius: 1rem;
+    }
+    
+    .security-result-header.success {
+        color: #10b981;
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        border: 2px solid #10b981;
+    }
+    
+    .security-result-header.error {
+        color: #444fef;
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 2px solid #444fef;
+    }
+    
+    .nat-display {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        border-radius: 1.5rem;
+        padding: 2.5rem;
+        margin: 2rem 0;
+        border: 2px solid #334155;
+        position: relative;
+    }
+    
+    .nat-display::before {
+        content: '🔒 FIREWALL NAT SESSIONS';
+        position: absolute;
+        top: -15px;
+        left: 20px;
+        background: #0f172a;
+        color: #10b981;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+    
+    .nat-session {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .nat-session:hover {
+        background: rgba(255, 255, 255, 0.1);
+        transform: translateX(5px);
+        border-color: #10b981;
+    }
+    
+    .nat-session-header {
+        color: #10b981;
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .nat-session-header i {
+        margin-right: 0.5rem;
+        color: #fbbf24;
+    }
+    
+    .nat-session-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .nat-detail {
+        background: rgba(16, 185, 129, 0.1);
+        padding: 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    
+    .nat-detail-label {
+        color: #6b7280;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .nat-detail-value {
+        color: #10b981;
+        font-weight: 700;
+        font-size: 1.1rem;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    }
+    
+    .error-display {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border-radius: 1.5rem;
+        padding: 2.5rem;
+        margin: 2rem 0;
+        border: 2px solid #444fef;
+        position: relative;
+    }
+    
+    .error-display::before {
+        content: '⚠️ ERROR';
+        position: absolute;
+        top: -15px;
+        left: 20px;
+        background: #444fef;
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+    }
+    
+    .error-display pre {
+        background: #f8fafc;
+        color: #dc2626;
+        padding: 2rem;
+        border-radius: 1rem;
+        font-size: 1.1rem;
+        margin: 1rem 0;
+        border: 2px solid #fecaca;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1);
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        line-height: 1.6;
+        overflow-x: auto;
+    }
+    
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .security-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin: 2rem 0;
+    }
+    
+    .stat-card {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 1.5rem;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3);
+    }
+    
+    .stat-number {
+        font-size: 3rem;
+        font-weight: 800;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-label {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        font-weight: 600;
+    }
+    
+    @media (max-width: 768px) {
+        .security-header h1 {
+            font-size: 2.5rem;
+        }
+        
+        .security-form-card {
+            padding: 2rem;
+            margin: 0 0.5rem 2rem 0.5rem;
+        }
+        
+        .security-form-card .card-header {
+            margin: -2rem -2rem 1.5rem -2rem;
+            padding: 1.5rem 2rem;
+            font-size: 1.5rem;
+        }
+        
+        .nat-session-details {
+            grid-template-columns: 1fr;
+        }
+    }
+    </style>
+{% endblock head %}
+
+{% block title %}
+    Security Tools - Firewall NAT Checker
+{% endblock title %}
+
+{% block body %}
+    <div class="security-header">
+        <div class="container">
+            <h1><i class="fas fa-shield-alt me-3"></i>Firewall NAT Checker</h1>
+            <p>Advanced Security Tool for Network Address Translation Monitoring</p>
+        </div>
+    </div>
+    
+    <div class="container security-container">
+        <div class="security-form-card">
+            <div class="card-header">
+                <i class="fas fa-fire me-2"></i>Check Firewall NAT Sessions
+            </div>
+            
+            <form action="{% url 'get_pa_nat' %}" method="post" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="row form-row">
+                    <div class="col-md-8 mx-auto">
+                        <label for="{{ form.target_ip.id_for_label }}" class="form-label">
+                            <i class="fas fa-search me-2"></i>{{ form.target_ip.label }}
+                        </label>
+                        {{ form.target_ip }}
+                        <div class="form-text text-muted">
+                            <i class="fas fa-info-circle me-1"></i>e.g. 192.168.1.1
+                    </div>
+                </div>
+                <div class="text-center">
+                    <button class="btn btn-security" type="submit">
+                        <i class="fas fa-search me-2"></i>Scan Firewall Sessions
+                    </button>
+                </div>
+            </form>
+            
+            {% if success %}
+                <div class="security-result-card success">
+                    <div class="security-result-header success">
+                        <i class="fas fa-check-circle me-3"></i>NAT Session Scan Complete
+                    </div>
+                    
+                    <div class="security-stats">
+                        <div class="stat-card">
+                            <div class="stat-number">{{ res|length }}</div>
+                            <div class="stat-label">Active Sessions</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number">{{ target_ip }}</div>
+                            <div class="stat-label">Target IP</div>
+                        </div>
+                    </div>
+                    
+                    <div class="nat-display">
+                        {% for source_ip, source_port, destination_ip, destination_port in res %}
+                            <div class="nat-session">
+                                <div class="nat-session-header">
+                                    <i class="fas fa-network-wired me-2"></i>NAT Session #{{ forloop.counter }}
+                                </div>
+                                <div class="nat-session-details">
+                                    <div class="nat-detail">
+                                        <div class="nat-detail-label">Source IP</div>
+                                        <div class="nat-detail-value">{{ source_ip }}</div>
+                                    </div>
+                                    <div class="nat-detail">
+                                        <div class="nat-detail-label">Source Port</div>
+                                        <div class="nat-detail-value">{{ source_port }}</div>
+                                    </div>
+                                    <div class="nat-detail">
+                                        <div class="nat-detail-label">Destination IP</div>
+                                        <div class="nat-detail-value">{{ destination_ip }}</div>
+                                    </div>
+                                    <div class="nat-detail">
+                                        <div class="nat-detail-label">Destination Port</div>
+                                        <div class="nat-detail-value">{{ destination_port }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="alert alert-success mt-3" role="alert">
+                        <i class="fas fa-shield-check me-2"></i>
+                        <strong>Security Scan Complete:</strong> Successfully retrieved {{ res|length }} NAT sessions for IP <code>{{ target_ip }}</code>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        
+        {% if error %}
+            <div class="security-result-card error">
+                <div class="security-result-header error">
+                    <i class="fas fa-exclamation-triangle me-3"></i>Security Scan Error
+                </div>
+                <div class="error-display">
+                    <pre>{{ error }}</pre>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock body %}

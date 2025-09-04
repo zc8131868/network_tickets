@@ -1,6 +1,5 @@
-import math
+a =[('source 10.55.116.0/24', 'destination any', 'translate-to "src: 123.136.14.116 (dynamic-ip-and-port) (pool idx: 2120)"')]
 
-a = math.log2(32)
-print(a)
+import re
 
-b = math.ceil(a)    
+print(a[0])

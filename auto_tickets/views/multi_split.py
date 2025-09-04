@@ -28,7 +28,14 @@ def multi_split(request):
                                 result = tickets_split(source_ip, destination_ip)
                                 result_list.append(result)
 
-                return render(request, 'multi_split.html', {'form': form, 'result_list': result_list})
+                # Check if we got any results
+                if result_list:
+                    # Don't pass form when we have results - only show results
+                    return render(request, 'multi_split.html', {'result_list': result_list})
+                else:
+                    # No results found, show error
+                    form.add_error('file', 'No valid data found in the Excel file. Please check that your file has data in columns C and E starting from row 4.')
+                    return render(request, 'multi_split.html', {'form': form})
             
             except Exception as e:
                 # If there's an error processing the file, show the form with error

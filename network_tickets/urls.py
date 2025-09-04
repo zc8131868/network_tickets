@@ -26,6 +26,7 @@ from auto_tickets.views.download_ITSRsample import download_ITSRsample
 from auto_tickets.views.ip_application import ip_application
 from auto_tickets.views.ip_deletion import ip_deletion
 from auto_tickets.views.login import login_view, logout_view
+from auto_tickets.views.get_pa_nat import get_pa_nat
 
 
 
@@ -42,6 +43,7 @@ urlpatterns = [
     path('download_sample/', download_ITSRsample, name='download_sample'),
     path('accounts/login/', login_view, name='login'),
     path('accounts/logout/', logout_view, name='logout'),
+    path('get_pa_nat/', get_pa_nat, name='get_pa_nat'),
 ]
 
 
