@@ -153,3 +153,17 @@ class IP_Application(models.Model):
 
     def __str__(self):
         return f"{self.__class__.__name__}(location: {self.location} | usage: {self.usage} | number: {self.number} | subnet: {self.subnet})"
+
+
+class PA_Service(models.Model):
+    PROTOCOL_CHOICES = [
+        ('tcp', 'TCP'),
+        ('udp', 'UDP'),
+    ]
+    
+    protocol = models.CharField(max_length=10, choices=PROTOCOL_CHOICES, verbose_name='protocol')
+    port = models.CharField(max_length=100, unique=False, verbose_name='port')
+    create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(protocol: {self.protocol} | port: {self.port})"
