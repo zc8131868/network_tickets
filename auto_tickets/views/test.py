@@ -7,6 +7,7 @@ import os
 import sys
 import logging
 from datetime import datetime
+from pprint import pprint
 
 # Add the parent directory to Python path so we can import network_tickets.settings
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -70,7 +71,8 @@ def auto_tickets_pa():
     # Initialize logging
     logger = setup_logging()
     logger.info("Starting auto_tickets_pa function")
-    
+    res_log = []
+    res_log.append('Starting auto_tickets_pa function')
     wb = openpyxl.load_workbook('/it_network/network_tickets/auto_tickets/sample.xlsx')
     sheet = wb['Content']
     logger.info("Excel file loaded successfully")
@@ -93,9 +95,11 @@ def auto_tickets_pa():
         net_connect = ConnectHandler(**firewall_PA)
         logger.info("Successfully connected to firewall")
         logger.info(f"Device prompt: {net_connect.find_prompt()}")
+        res_log.append(f"Successfully connected to firewall")
     except Exception as e:
         logger.error(f"Failed to connect to firewall: {e}")
-        return
+        res_log.append(f"Failed to connect to firewall: {e}")
+        return res_log
 
 
     for row in range(start_row, end_row+1):
@@ -164,6 +168,7 @@ def auto_tickets_pa():
             logger.info(f"Executing command: {command}")
             check_sip_raw = net_connect.send_command(command)
             logger.debug(f'check_sip_raw response: {check_sip_raw}')
+            res_log.append(f"Executing command: {command}")
             print(f'check_sip_raw: {check_sip_raw}')
             # print(f'check_sip_raw:{check_sip_raw}')
 
@@ -173,6 +178,7 @@ def auto_tickets_pa():
             # print(f'interface:{interface}')
             # print('-' * 100)
             logger.info(f"Source IP {sip} mapped to interface {interface}")
+            res_log.append(f"Source IP {sip} mapped to interface {interface}")
             sip_interface_dic[sip] = interface
 
 
@@ -181,9 +187,11 @@ def auto_tickets_pa():
             logger.info(f"Executing command: {command}")
             check_dip_raw = net_connect.send_command(command)
             logger.debug(f'check_dip_raw response: {check_dip_raw}')
+            res_log.append(f"Executing command: {command}")
             # print(check_dip_raw)
             interface = re.search(r'interface\s(ethernet\d/\d+),',check_dip_raw).group(1)    
             logger.info(f"Destination IP {dip} mapped to interface {interface}")
+            res_log.append(f"Destination IP {dip} mapped to interface {interface}")
             dip_interface_dic[dip] = interface
         
     #get source ip and destination ip in reach row, if the interfaces of source ip and destination ip are different, then add to the set
@@ -200,12 +208,20 @@ def auto_tickets_pa():
                     print(f'destination ip: {dip}')
                     print(f'destination port: {dport_dic[row]}')
                     print('-' * 100)
-                    
+                    res_log.append(f"ticket number: {ticket_number_dic[row]}")
+                    res_log.append(f"source interface: {s_interface}")
+                    res_log.append(f"destination interface: {d_interface}")
+                    res_log.append(f"source ip: {sip}")
+                    res_log.append(f"destination ip: {dip}")
+                    res_log.append(f"destination port: {dport_dic[row]}")
+                    res_log.append('-' * 100)
                     sip_ip_set.add(sip)
                     dip_ip_set.add(dip)
                 else:
                     print(f'{sip} and {dip} belong to the same zone. No action needed')
                     print('-' * 100)
+                    res_log.append(f"{sip} and {dip} belong to the same zone. No action needed")
+                    res_log.append('-' * 100)
 
         #skip the current row if there is no action needed   
         if sip_ip_set ==set():
@@ -213,6 +229,7 @@ def auto_tickets_pa():
 
         print('-' * 100)
         print('Create source ip and destination ip in the firewall')
+        res_log.append(f"Create source ip and destination ip in the firewall")
         print('-' * 100)
         
         print(f'source set: {sip_ip_set}')
@@ -221,38 +238,44 @@ def auto_tickets_pa():
 
         # print('enter config mode')
         logger.info("Entering configuration mode")
+        res_log.append(f"Entering configuration mode")
         out = net_connect.config_mode()
         logger.debug(f"Config mode response: {out}")
         # print(out)
         # print('-' * 100)
         logger.info("Starting address creation in firewall")
-        
+        res_log.append(f"Starting address creation in firewall")
         #create source ip and destination ip in the firewall
         for sip in sip_ip_set:
             command = f'set address {sip} description generated-by-netcare ip-netmask {sip}'
             logger.info(f"Creating source address: {command}")
+            res_log.append(f"Creating source address: {command}")
             try:
                 res = net_connect.send_command(command)
                 logger.info(f"Successfully created address {sip}")
                 print(f"Created address {sip}: {res}")
+                res_log.append(f"Successfully created address {sip}")
             except Exception as e:
                 logger.error(f"Failed to create address {sip}: {e}")
                 print(f"Failed to create address {sip}: {e}")
-        
+                res_log.append(f"Failed to create address {sip}: {e}")
         # Create destination addresses  
         for dip in dip_ip_set:
             command = f'set address {dip} description generated-by-netcare ip-netmask {dip}'
             logger.info(f"Creating destination address: {command}")
+            res_log.append(f"Creating destination address: {command}")
             try:
                 res = net_connect.send_command(command)
                 logger.info(f"Successfully created address {dip}")
                 print(f"Created address {dip}: {res}")
+                res_log.append(f"Successfully created address {dip}")
             except Exception as e:
                 logger.error(f"Failed to create address {dip}: {e}")
                 print(f"Failed to create address {dip}: {e}")
+                res_log.append(f"Failed to create address {dip}: {e}")
         
         print('-' * 100)
-        
+        res_log.append(f"Create source address-group and destination address-group in the firewall")
         #create source address-group and destination address-group in the firewall
         print('Create source address-group and destination address-group in the firewall')
         sleep(5)
@@ -263,41 +286,48 @@ def auto_tickets_pa():
 
         command = f'edit address-group {ticket_number_dic[row]}-source'
         logger.info(f"Creating source address-group: {command}")
+        res_log.append(f"Creating source address-group: {command}")
         res = net_connect.send_command(command)
         logger.info(f"Successfully created source address-group: {res}")
+        res_log.append(f"Successfully created source address-group: {res}")
         print('-' * 100)
 
         for sip in sip_ip_set:
             command = f'set static {sip}'
             res = net_connect.send_command(command)
             logger.info(f"Successfully added static address: {res}")
+            res_log.append(f"Successfully added static address: {res}")
             print(f'Added static address: {sip}')
         command = f'set description generated-by-netcare'
         res = net_connect.send_command(command)
         logger.info(f"Successfully set description: {res}")
-
+        res_log.append(f"Successfully set description: {res}")
         net_connect.send_command('exit')
         print('-' * 100)
         
         command = f'edit address-group {ticket_number_dic[row]}-destination'
         logger.info(f"Creating destination address-group: {command}")
+        res_log.append(f"Creating destination address-group: {command}")
         res = net_connect.send_command(command)
         logger.info(f"Successfully created destination address-group: {res}")
         print('-' * 100)
         sleep(2)
         for dip in dip_ip_set:
             command = f'set static {dip}'
+            res_log.append(f"Adding static address: {command}")
             res = net_connect.send_command(command)
             logger.info(f"Successfully added static address: {res}")
             print(f'Added static address: {dip}')
+            res_log.append(f"Successfully added static address: {res}")
         command = f'set description generated-by-netcare'
         res = net_connect.send_command(command)
         logger.info(f"Successfully set description: {res}")
-
+        res_log.append(f"Successfully set description: {res}")
 
         print('-' * 100)
         # # #create service and security rule in the firewall
         print('create service and security rule in the firewall')
+        res_log.append(f"create service and security rule in the firewall")
         sleep(5)
         net_connect.send_command('exit')
         # print('create service in the firewall')
@@ -308,12 +338,14 @@ def auto_tickets_pa():
                 if dport != 'icmp' and dport != 'ICMP':
                     command = f'set service tcp-{dport}-netcare description generated-by-netcare protocol tcp port {dport}'
                     logger.info(f"Creating service: {command}")
+                    res_log.append(f"Creating service: {command}")
                     res = net_connect.send_command(command)
                     logger.info(f"Successfully created service: {res}")
 
                     command_list = ['edit rulebase security rules ' + ticket_number_dic[row] + '-netcare', 
                     'set source ' + ticket_number_dic[row] + '-source' + ' destination ' + ticket_number_dic[row] + '-destination from any to any service ' + 'tcp-' + dport + '-netcare',
                     'set description generated-by-netcare','exit', 'exit', 'exit']
+                    res_log.append(f"Creating security rule: {command_list}")
                     res = net_connect.send_config_set(command_list, exit_config_mode=False)
                     logger.info(f"Successfully created security rule: {res}")
 
@@ -324,6 +356,7 @@ def auto_tickets_pa():
                     command_list = ['edit rulebase security rules ' + ticket_number_dic[row] + '-netcare', 
                     'set source ' + ticket_number_dic[row] + '-source' + ' destination ' + ticket_number_dic[row] + '-destination from any to any application icmp ',
                     'set description generated-by-netcare','exit', 'exit', 'exit']
+                    res_log.append(f"Creating security rule: {command_list}")
                     res = net_connect.send_config_set(command_list, exit_config_mode=False)
                     logger.info(f"Successfully created security rule: {res}")
 
@@ -332,12 +365,14 @@ def auto_tickets_pa():
                 if dport != 'icmp' and dport != 'ICMP':
                     command = f'set service udp-{dport}-netcare description generated-by-netcare protocol udp port {dport}'
                     logger.info(f"Creating service: {command}")
+                    res_log.append(f"Creating service: {command}")
                     res = net_connect.send_command(command)
                     logger.info(f"Successfully created service: {res}")
                     
                     command_list = ['edit rulebase security rules ' + ticket_number_dic[row] + '-netcare', 
                     'set source ' + ticket_number_dic[row] + '-source' + ' destination ' + ticket_number_dic[row] + '-destination from any to any service ' + 'udp-' + dport + '-netcare',
                     'set description generated-by-netcare','exit', 'exit', 'exit']
+                    res_log.append(f"Creating security rule: {command_list}")
                     res = net_connect.send_config_set(command_list, exit_config_mode=False)
                     logger.info(f"Successfully created security rule: {res}")
 
@@ -345,6 +380,7 @@ def auto_tickets_pa():
                     command_list = ['edit rulebase security rules ' + ticket_number_dic[row] + '-netcare', 
                     'set source ' + ticket_number_dic[row] + '-source' + ' destination ' + ticket_number_dic[row] + '-destination from any to any application icmp ',
                     'set description generated-by-netcare','exit', 'exit', 'exit']
+                    res_log.append(f"Creating security rule: {command_list}")
                     res = net_connect.send_config_set(command_list, exit_config_mode=False)
                     logger.info(f"Successfully created security rule: {res}")
                             
@@ -352,6 +388,7 @@ def auto_tickets_pa():
             command_list = ['edit rulebase security rules ' + ticket_number_dic[row] + '-netcare', 
             'set source ' + ticket_number_dic[row] + '-source' + ' destination ' + ticket_number_dic[row] + '-destination from any to any application icmp ',
             'set description generated-by-netcare','exit', 'exit', 'exit']
+            res_log.append(f"Creating security rule: {command_list}")
             res = net_connect.send_config_set(command_list, exit_config_mode=False)
             logger.info(f"Successfully created security rule: {res}")
             
@@ -360,6 +397,7 @@ def auto_tickets_pa():
 
         
         print('I am here')
+        res_log.append(f"Exiting configuration mode")
         logger.info("Exiting configuration mode")
         # print("Back to operational mode. Prompt:", net_connect.find_prompt())
         net_connect.exit_config_mode()   
@@ -377,10 +415,10 @@ def auto_tickets_pa():
         {4: ['10.0.28.138'], 5: ['203.142.100.51', '203.142.100.52', '203.142.100.103', '203.142.100.104']}
         {4: ['3306', 'ICMP'], 5: ['53', '54']}
    '''
-
+    return res_log
         
-auto_tickets_pa()
-
+log = auto_tickets_pa()
+pprint(f'log: {log}')
                 
                     
             

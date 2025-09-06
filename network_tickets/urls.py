@@ -27,6 +27,7 @@ from auto_tickets.views.ip_application import ip_application
 from auto_tickets.views.ip_deletion import ip_deletion
 from auto_tickets.views.login import login_view, logout_view
 from auto_tickets.views.get_pa_nat import get_pa_nat
+from auto_tickets.views.auto_tickets_pa import auto_tickets_pa
 
 
 
@@ -44,6 +45,7 @@ urlpatterns = [
     path('accounts/login/', login_view, name='login'),
     path('accounts/logout/', logout_view, name='logout'),
     path('get_pa_nat/', get_pa_nat, name='get_pa_nat'),
+    path('auto_tickets_pa/', auto_tickets_pa, name='auto_tickets_pa'),
 ]
 
 

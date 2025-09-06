@@ -70,7 +70,7 @@
 {% endblock head %}
 
 {% block title %}
-    Multi Ticket Split - Bulk Processing
+    Auto Tickets PA - Bulk Processing
 {% endblock title %}
 
 {% block body %}
@@ -78,7 +78,7 @@
     <div class="container">
         <div class="row align-items-center">
             <div class="col-lg-8">
-                <h1><i class="fas fa-users me-3"></i>Multi Ticket Split</h1>
+                <h1><i class="fas fa-fire me-3"></i>Auto Tickets on Palo Alto</h1>
                 <p class="lead">Bulk process multiple tickets using Excel file upload functionality</p>
             </div>
             <div class="col-lg-4 text-end">
@@ -103,7 +103,7 @@
                     <h4 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Excel File</h4>
                 </div>
                 <div class="card-body">
-                    <form action="{% url 'multi_split' %}" method="post" enctype="multipart/form-data" id="uploadForm">
+                    <form action="{% url 'auto_tickets_pa' %}" method="post" enctype="multipart/form-data" id="uploadForm">
                         {% csrf_token %}
                         
                         <div class="upload-area" id="uploadArea">
@@ -167,7 +167,7 @@
                                 </div>
                             </div>
                             <div class="col-md-4 text-center">
-                                <a href="{% url 'multi_split' %}" class="btn btn-success btn-sm">
+                                <a href="{% url 'auto_tickets_pa' %}" class="btn btn-success btn-sm">
                                     <i class="fas fa-upload me-2"></i>Upload Another File
                                 </a>
                             </div>
@@ -304,6 +304,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 fileInput.dispatchEvent(event);
             }
         });
+        
+        // Form submission handler to show processing message
+        const uploadForm = document.getElementById('uploadForm');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(e) {
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing now, please wait...';
+                uploadBtn.classList.add('btn-secondary');
+                uploadBtn.classList.remove('btn-primary');
+            });
+        }
         
         // Initial state
         uploadBtn.disabled = true;
