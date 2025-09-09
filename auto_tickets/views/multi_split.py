@@ -13,8 +13,8 @@ def multi_split(request):
             uploaded_file = request.FILES['file']
             try:
                 wb = openpyxl.load_workbook(uploaded_file)
-                sheet = wb['Content']
-
+                # sheet = wb['Content']
+                sheet = wb.active
                 source_ip_list = []
                 destination_ip_list = []
                 result_list = []

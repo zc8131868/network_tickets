@@ -1,4 +1,2 @@
-for i in range(1, 10):
-    if i == 3:
-        continue
-    print(i)
+a = f'{1}-tcp-netcare'
+print(a)

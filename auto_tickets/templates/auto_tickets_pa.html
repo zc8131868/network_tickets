@@ -66,6 +66,46 @@
         border-radius: 1rem;
         padding: 1.5rem;
     }
+    
+    .error-container {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 2px solid #ef4444;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .error-item {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 2px solid #ef4444;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .error-item:hover {
+        border-color: #dc2626;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    }
+    
+    .error-item pre {
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        color: #991b1b;
+    }
+    
+    .alert-error {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 2px solid #ef4444;
+        border-radius: 1rem;
+        color: #991b1b;
+    }
     </style>
 {% endblock head %}
 
@@ -152,6 +192,62 @@
             </div>
             {% endif %}
 
+            <!-- Error Display Section -->
+            {% if error_list %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Processing Errors</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-exclamation-circle text-danger me-2"></i>
+                                    <span class="fw-bold text-danger">{{ error_list|length }} errors encountered</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <a href="{% url 'auto_tickets_pa' %}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-redo me-2"></i>Try Again
+                                </a>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-outline-danger btn-sm" onclick="copyAllErrors()">
+                                    <i class="fas fa-copy me-2"></i>Copy All Errors
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="error-container">
+                            {% for error in error_list %}
+                                <div class="error-item">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 text-danger"><i class="fas fa-times-circle me-2"></i>Error #{{ forloop.counter }}</h6>
+                                        <button class="btn btn-outline-danger btn-sm copy-error-btn" data-index="{{ forloop.counter0 }}">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre id="error-{{ forloop.counter0 }}">{{ error }}</pre>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- General Error Message -->
+            {% if error_message %}
+                <div class="alert alert-error mb-4">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-3" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <h5 class="mb-1">Processing Error</h5>
+                            <p class="mb-0">{{ error_message }}</p>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             <!-- Results Display -->
             {% if result_list %}
                 <div class="card">
@@ -220,6 +316,8 @@
                                 <li><i class="fas fa-arrow-right text-info me-2"></i>Each row represents one ticket</li>
                                 <li><i class="fas fa-arrow-right text-info me-2"></i>Results are displayed after upload</li>
                                 <li><i class="fas fa-arrow-right text-info me-2"></i>Copy results for further use</li>
+                                <li><i class="fas fa-exclamation-triangle text-danger me-2"></i>Errors are shown if processing fails</li>
+                                <li><i class="fas fa-redo text-warning me-2"></i>Use "Try Again" to retry after errors</li>
                             </ul>
                         </div>
                     </div>
@@ -313,7 +411,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing now, please wait...';
                 uploadBtn.classList.add('btn-secondary');
                 uploadBtn.classList.remove('btn-primary');
+                
+                // Add error handling for file validation
+                const file = fileInput.files[0];
+                if (!file) {
+                    e.preventDefault();
+                    showError('Please select a file before processing.');
+                    resetUploadButton();
+                    return;
+                }
+                
+                // Check file type
+                const allowedTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+                if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+                    e.preventDefault();
+                    showError('Please select a valid Excel file (.xlsx or .xls).');
+                    resetUploadButton();
+                    return;
+                }
+                
+                // Check file size (limit to 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    e.preventDefault();
+                    showError('File size too large. Please select a file smaller than 10MB.');
+                    resetUploadButton();
+                    return;
+                }
             });
+        }
+        
+        function showError(message) {
+            // Remove existing error messages
+            const existingErrors = document.querySelectorAll('.upload-error');
+            existingErrors.forEach(error => error.remove());
+            
+            // Create error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-danger upload-error mt-3';
+            errorDiv.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // Insert error message after upload area
+            uploadArea.parentNode.insertBefore(errorDiv, uploadArea.nextSibling);
+            
+            // Auto-remove error after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
+        
+        function resetUploadButton() {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
+            uploadBtn.classList.remove('btn-secondary');
+            uploadBtn.classList.add('btn-primary');
         }
         
         // Initial state
@@ -350,6 +507,10 @@ document.addEventListener('click', function(e) {
         const btn = e.target.closest('.copy-result-btn');
         const index = btn.getAttribute('data-index');
         copyResult(index);
+    } else if (e.target.closest('.copy-error-btn')) {
+        const btn = e.target.closest('.copy-error-btn');
+        const index = btn.getAttribute('data-index');
+        copyError(index);
     }
 });
 
@@ -373,6 +534,49 @@ function copyAllResults() {
             btn.innerHTML = originalHTML;
             btn.classList.remove('btn-success');
             btn.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+
+function copyError(index) {
+    const errorElement = document.getElementById('error-' + index);
+    const text = errorElement.textContent;
+    navigator.clipboard.writeText(text).then(function() {
+        // Show success feedback
+        const btn = document.querySelector(`[data-index="${index}"].copy-error-btn`);
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-danger');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-danger');
+        }, 2000);
+    });
+}
+
+function copyAllErrors() {
+    const errors = document.querySelectorAll('.error-item pre');
+    let allText = '';
+    errors.forEach(function(error, index) {
+        allText += 'Error #' + (index + 1) + ':\n';
+        allText += error.textContent + '\n\n';
+    });
+    
+    navigator.clipboard.writeText(allText).then(function() {
+        // Show success feedback
+        const btn = event.target;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-danger');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-danger');
         }, 2000);
     });
 }
