@@ -31,6 +31,7 @@ ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
     "https://cmhk-it-netcare.com",
+    "https://www.cmhk-it-netcare.com",
 ]
 
 # Application definition
