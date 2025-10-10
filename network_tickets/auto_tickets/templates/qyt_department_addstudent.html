@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    {# 为了在Form中添加必选项的星,需要添加的css #}
+    <style type="text/css">
+    label.required::before {
+        content: "*";
+        color: red;
+        font-weight: bold;
+        margin-right: 4px;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+    
+    .result-display {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        border: 2px solid #e2e8f0;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+    }
+    
+    .result-display pre {
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        color: #374151;
+    }
+    </style>
+{% endblock head %}
+
+{% block title %}
+    Single Ticket Split - IP Processing
+{% endblock title %}
+
+{% block body %}
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1><i class="fas fa-user me-3"></i>Single Ticket Split</h1>
+                <p class="lead">Process individual ticket splitting operations with detailed IP information</p>
+            </div>
+            <div class="col-lg-4 text-end">
+                <div class="stats-card">
+                    <div class="stats-number">1</div>
+                    <div>Ticket Processing</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-edit me-2"></i>IP Information Input</h4>
+                </div>
+                <div class="card-body">
+                    {# 导入居家必备三条信息, success error warning #}
+                    {% include "qyt_department_3_message.html" %}
+                    
+                    <form action="" method="post" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.source_ip.id_for_label }}">
+                                        <i class="fas fa-network-wired me-2"></i>{{ form.source_ip.label }}
+                                    </label>
+                                    {{ form.source_ip }}
+                                    {% if form.source_ip.help_text %}
+                                        <medium class="form-text text-muted">{{ form.source_ip.help_text }}</medium>
+                                    {% endif %}
+                                    {% if form.source_ip.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.source_ip.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.destination_ip.id_for_label }}">
+                                        <i class="fas fa-route me-2"></i>{{ form.destination_ip.label }}
+                                    </label>
+                                    {{ form.destination_ip }}
+                                    {% if form.destination_ip.help_text %}
+                                        <medium class="form-text text-muted">{{ form.destination_ip.help_text }}</medium>
+                                    {% endif %}
+                                    {% if form.destination_ip.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.destination_ip.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.traffic_oam.id_for_label }}">
+                                        <i class="fas fa-chart-line me-2"></i>{{ form.traffic_oam.label }}
+                                    </label>
+                                    {{ form.traffic_oam }}
+                                    {% if form.traffic_oam.help_text %}
+                                        <medium class="form-text text-muted">{{ form.traffic_oam.help_text }}</medium>
+                                    {% endif %}
+                                    {% if form.traffic_oam.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.traffic_oam.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.location.id_for_label }}">
+                                        <i class="fas fa-map-marker-alt me-2"></i>{{ form.location.label }}
+                                    </label>
+                                    {{ form.location }}
+                                    {% if form.location.help_text %}
+                                        <medium class="form-text text-muted">{{ form.location.help_text }}</medium>
+                                    {% endif %}
+                                    {% if form.location.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.location.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="form-group">
+                                    <label class="form-label" for="{{ form.device.id_for_label }}">
+                                        <i class="fas fa-server me-2"></i>{{ form.device.label }}
+                                    </label>
+                                    {{ form.device }}
+                                    {% if form.device.help_text %}
+                                        <medium class="form-text text-muted">{{ form.device.help_text }}</medium>
+                                    {% endif %}
+                                    {% if form.device.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.device.errors.0 }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Home
+                            </a>
+                            <button class="btn btn-primary btn-lg" type="submit">
+                                <i class="fas fa-play me-2"></i>Process Ticket
+                            </button>
+                        </div>
+                    </form>
+                    
+                    {% if result %}
+                        <div class="result-display">
+                            <h5 class="mb-3"><i class="fas fa-check-circle text-success me-2"></i>Processing Result</h5>
+                            <pre>{{ result }}</pre>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-question-circle me-2"></i>How to Use</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-info-circle text-primary me-2"></i>Required Fields</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i>Source IP Address</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Destination IP Address</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Traffic OAM Information</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-lightbulb text-warning me-2"></i>Tips</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Use valid IP address format</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Location and device are optional</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Results will be displayed below</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock body %}

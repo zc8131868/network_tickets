@@ -1,0 +1,587 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    {# 为了在Form中添加必选项的星,需要添加的css #}
+    <style type="text/css">
+    label.required::before {
+        content: "*";
+        color: red;
+        font-weight: bold;
+        margin-right: 4px;
+    }
+    
+    .upload-area {
+        border: 3px dashed #d1d5db;
+        border-radius: 1rem;
+        padding: 3rem 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+    
+    .upload-area:hover {
+        border-color: var(--primary-color);
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    }
+    
+    .upload-area.dragover {
+        border-color: var(--primary-color);
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        transform: scale(1.02);
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+    
+    .file-input {
+        display: none;
+    }
+    
+    .result-item {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        border: 2px solid #e2e8f0;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .result-item:hover {
+        border-color: var(--primary-color);
+        box-shadow: var(--card-shadow-hover);
+    }
+    
+    .result-item pre {
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        color: #374151;
+    }
+    
+    .sample-download {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border: 2px solid #0ea5e9;
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+    
+    .error-container {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 2px solid #ef4444;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .error-item {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 2px solid #ef4444;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .error-item:hover {
+        border-color: #dc2626;
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    }
+    
+    .error-item pre {
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        color: #991b1b;
+    }
+    
+    .alert-error {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 2px solid #ef4444;
+        border-radius: 1rem;
+        color: #991b1b;
+    }
+    </style>
+{% endblock head %}
+
+{% block title %}
+    Auto Tickets PA - Bulk Processing
+{% endblock title %}
+
+{% block body %}
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1><i class="fas fa-fire me-3"></i>Auto Tickets on Palo Alto</h1>
+                <p class="lead">Bulk process multiple tickets using Excel file upload functionality</p>
+            </div>
+            <div class="col-lg-4 text-end">
+                <div class="stats-card">
+                    <div class="stats-number">Bulk</div>
+                    <div>Processing</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+
+            
+            <!-- File Upload Section -->
+            {% if not result_list %}
+            <div class="card mb-4" id="uploadSection">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Excel File</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{% url 'auto_tickets_pa' %}" method="post" enctype="multipart/form-data" id="uploadForm">
+                        {% csrf_token %}
+                        
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt text-primary mb-3" style="font-size: 3rem;"></i>
+                            <h5 class="mb-3">Drag & Drop your Excel file here</h5>
+                            <p class="text-muted mb-4">or click to browse files</p>
+                            
+                            <div class="input-group justify-content-center">
+                                <label class="input-group-text" for="customFileInput">
+                                    <i class="fas fa-file-excel me-2"></i>Excel File (.xlsx)
+                                </label>
+                                <input type="file" id="customFileInput" name="file" class="form-control" accept=".xlsx,.xls" required>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <button class="btn btn-primary btn-lg" type="submit" id="uploadBtn" disabled>
+                                    <i class="fas fa-play me-2"></i>Process File
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    
+
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Sample Download Section -->
+            {% if not result_list %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="sample-download">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="mb-2"><i class="fas fa-download me-2"></i>Need a Sample File?</h5>
+                                <p class="text-muted mb-0">Download our sample Excel template to see the required format for bulk processing.</p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <a href="{% url 'download_sample' %}" class="btn btn-success btn-lg">
+                                    <i class="fas fa-file-excel me-2"></i>Download Sample
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Error Display Section -->
+            {% if error_messages %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4 class="mb-0 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Processing Errors</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-exclamation-circle text-danger me-2"></i>
+                                    <span class="fw-bold text-danger">{{ error_messages|length }} errors encountered</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <a href="{% url 'auto_tickets_pa' %}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-redo me-2"></i>Try Again
+                                </a>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-outline-danger btn-sm" onclick="copyAllErrors()">
+                                    <i class="fas fa-copy me-2"></i>Copy All Errors
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="error-container">
+                            {% for error in error_messages %}
+                                <div class="error-item">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0 text-danger"><i class="fas fa-times-circle me-2"></i>Error #{{ forloop.counter }}</h6>
+                                        <button class="btn btn-outline-danger btn-sm copy-error-btn" data-index="{{ forloop.counter0 }}">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre id="error-{{ forloop.counter0 }}">{{ error }}</pre>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+
+            <!-- General Error Message -->
+            {% if error_message %}
+                <div class="alert alert-error mb-4">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-3" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <h5 class="mb-1">Processing Error</h5>
+                            <p class="mb-0">{{ error_message }}</p>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Results Display -->
+            {% if result_list %}
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0"><i class="fas fa-check-circle me-2"></i>Processing Results</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-list text-primary me-2"></i>
+                                    <span class="fw-bold">{{ result_list|length }} results processed</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <a href="{% url 'auto_tickets_pa' %}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-upload me-2"></i>Upload Another File
+                                </a>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <button class="btn btn-outline-primary btn-sm" onclick="copyAllResults()">
+                                    <i class="fas fa-copy me-2"></i>Copy All Results
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="results-container">
+                            {% for result in result_list %}
+                                <div class="result-item">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0"><i class="fas fa-file-alt me-2"></i>Result #{{ forloop.counter }}</h6>
+                                        <button class="btn btn-outline-secondary btn-sm copy-result-btn" data-index="{{ forloop.counter0 }}">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <pre id="result-{{ forloop.counter0 }}">{{ result }}</pre>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Instructions Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-info-circle me-2"></i>Instructions</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-file-excel text-success me-2"></i>Excel Format Requirements</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-success me-2"></i>Use the provided sample template</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Include all required columns</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Save as .xlsx format</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-lightbulb text-warning me-2"></i>Processing Tips</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Each row represents one ticket</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Results are displayed after upload</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Copy results for further use</li>
+                                <li><i class="fas fa-exclamation-triangle text-danger me-2"></i>Errors are shown if processing fails</li>
+                                <li><i class="fas fa-redo text-warning me-2"></i>Use "Try Again" to retry after errors</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Prevent default drag and drop behavior on the entire page
+document.addEventListener('dragover', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('drop', function(e) {
+    e.preventDefault();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('customFileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    
+    // Check if results are displayed - if so, don't initialize upload functionality
+    const resultsContainer = document.querySelector('.results-container');
+    if (resultsContainer) {
+        console.log('DEBUG: Results are displayed, skipping upload initialization');
+        return;
+    }
+    
+    // Only run upload functionality if the form exists (no results displayed)
+    if (uploadArea && fileInput && uploadBtn) {
+        console.log('DEBUG: Upload elements found, initializing simple file handling');
+        
+        // Simple file input change handler
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                console.log('DEBUG: File selected:', file.name);
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File (' + file.name + ')';
+            } else {
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
+            }
+        });
+        
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragenter', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!uploadArea.contains(e.relatedTarget)) {
+                uploadArea.classList.remove('dragover');
+            }
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                console.log('DEBUG: File dropped:', files[0].name);
+                fileInput.files = files;
+                
+                // Trigger the change event
+                const event = new Event('change', { bubbles: true });
+                fileInput.dispatchEvent(event);
+            }
+        });
+        
+        // Form submission handler to show processing message
+        const uploadForm = document.getElementById('uploadForm');
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', function(e) {
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing now, please wait...';
+                uploadBtn.classList.add('btn-secondary');
+                uploadBtn.classList.remove('btn-primary');
+                
+                // Add error handling for file validation
+                const file = fileInput.files[0];
+                if (!file) {
+                    e.preventDefault();
+                    showError('Please select a file before processing.');
+                    resetUploadButton();
+                    return;
+                }
+                
+                // Check file type
+                const allowedTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+                if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+                    e.preventDefault();
+                    showError('Please select a valid Excel file (.xlsx or .xls).');
+                    resetUploadButton();
+                    return;
+                }
+                
+                // Check file size (limit to 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    e.preventDefault();
+                    showError('File size too large. Please select a file smaller than 10MB.');
+                    resetUploadButton();
+                    return;
+                }
+            });
+        }
+        
+        function showError(message) {
+            // Remove existing error messages
+            const existingErrors = document.querySelectorAll('.upload-error');
+            existingErrors.forEach(error => error.remove());
+            
+            // Create error message
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-danger upload-error mt-3';
+            errorDiv.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            // Insert error message after upload area
+            uploadArea.parentNode.insertBefore(errorDiv, uploadArea.nextSibling);
+            
+            // Auto-remove error after 5 seconds
+            setTimeout(() => {
+                if (errorDiv.parentNode) {
+                    errorDiv.remove();
+                }
+            }, 5000);
+        }
+        
+        function resetUploadButton() {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
+            uploadBtn.classList.remove('btn-secondary');
+            uploadBtn.classList.add('btn-primary');
+        }
+        
+        // Initial state
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
+        
+    } else {
+        console.log('DEBUG: Upload elements not found');
+    }
+});
+
+function copyResult(index) {
+    const resultElement = document.getElementById('result-' + index);
+    const text = resultElement.textContent;
+    navigator.clipboard.writeText(text).then(function() {
+        // Show success feedback
+        const btn = document.querySelector(`[data-index="${index}"]`);
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-secondary');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-secondary');
+        }, 2000);
+    });
+}
+
+// Add event delegation for copy buttons
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.copy-result-btn')) {
+        const btn = e.target.closest('.copy-result-btn');
+        const index = btn.getAttribute('data-index');
+        copyResult(index);
+    } else if (e.target.closest('.copy-error-btn')) {
+        const btn = e.target.closest('.copy-error-btn');
+        const index = btn.getAttribute('data-index');
+        copyError(index);
+    }
+});
+
+function copyAllResults() {
+    const results = document.querySelectorAll('.result-item pre');
+    let allText = '';
+    results.forEach(function(result, index) {
+        allText += 'Result #' + (index + 1) + ':\n';
+        allText += result.textContent + '\n\n';
+    });
+    
+    navigator.clipboard.writeText(allText).then(function() {
+        // Show success feedback
+        const btn = event.target;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-primary');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+
+function copyError(index) {
+    const errorElement = document.getElementById('error-' + index);
+    const text = errorElement.textContent;
+    navigator.clipboard.writeText(text).then(function() {
+        // Show success feedback
+        const btn = document.querySelector(`[data-index="${index}"].copy-error-btn`);
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-danger');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-danger');
+        }, 2000);
+    });
+}
+
+function copyAllErrors() {
+    const errors = document.querySelectorAll('.error-item pre');
+    let allText = '';
+    errors.forEach(function(error, index) {
+        allText += 'Error #' + (index + 1) + ':\n';
+        allText += error.textContent + '\n\n';
+    });
+    
+    navigator.clipboard.writeText(allText).then(function() {
+        // Show success feedback
+        const btn = event.target;
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check me-2"></i>Copied!';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-danger');
+        
+        setTimeout(function() {
+            btn.innerHTML = originalHTML;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-danger');
+        }, 2000);
+    });
+}
+
+
+</script>
+{% endblock body %}

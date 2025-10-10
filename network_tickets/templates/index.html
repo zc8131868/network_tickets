@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% block title %}
+    IT Network Tools - Home
+{% endblock title %}
+
+{% block body %}
+<div class="page-header animate-fade-in">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-12 text-center">
+                <h1><i class="fas fa-router me-3 animate-pulse"></i>Netcare-Care your network</h1>
+                <p class="lead">AI and Automation empowered by the IT-Network</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Quick Actions -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4"><i class="fas fa-bolt me-2"></i>Quick Actions</h2>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card feature-card h-100 animate-fade-in" style="animation-delay: 0.3s;">
+                <div class="feature-icon">
+                    <i class="fas fa-cut"></i>
+                </div>
+                <h4>Single Ticket Split</h4>
+                <p class="text-muted">Process individual tickets</p>
+                <a href="/single_split/" class="btn btn-primary">
+                    <i class="fas fa-arrow-right me-2"></i>Start
+                </a>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card feature-card h-100 animate-fade-in" style="animation-delay: 0.4s;">
+                <div class="feature-icon">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <h4>Multi Tickets Split</h4>
+                <p class="text-muted">Bulk process with Excel</p>
+                <a href="/multi_split/" class="btn btn-primary">
+                    <i class="fas fa-arrow-right me-2"></i>Start
+                </a>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card feature-card h-100 animate-fade-in" style="animation-delay: 0.1s;">
+                <div class="feature-icon">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <h4>Auto Network</h4>
+                <p class="text-muted">Auto network</p>
+                <a href="/auto_tickets_pa/" class="btn btn-primary">
+                    <i class="fas fa-arrow-right me-2"></i>Start
+                </a>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-4">
+            <div class="card feature-card h-100 animate-fade-in" style="animation-delay: 0.2s;">
+                <div class="feature-icon">
+                    <i class="fas fa-trash-alt"></i>
+                </div>
+                <h4>Check NAT IP</h4>
+                <p class="text-muted">Check NAT IP</p>
+                <a href="/get_pa_nat/" class="btn btn-primary">
+                    <i class="fas fa-arrow-right me-2"></i>Check
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Overview -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4"><i class="fas fa-star me-2"></i>Features</h2>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-primary bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-search text-primary"></i>
+                        </div>
+                        <h5 class="mb-0">IP Management</h5>
+                    </div>
+                    <p class="text-muted">Comprehensive IP database with location tracking.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-success bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-file-excel text-success"></i>
+                        </div>
+                        <h5 class="mb-0">Excel Integration</h5>
+                    </div>
+                    <p class="text-muted">Bulk processing with Excel templates.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-warning bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-cogs text-warning"></i>
+                        </div>
+                        <h5 class="mb-0">Automated Processing</h5>
+                    </div>
+                    <p class="text-muted">Smart IP matching and ticket splitting.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-info bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-shield-alt text-info"></i>
+                        </div>
+                        <h5 class="mb-0">Secure & Reliable</h5>
+                    </div>
+                    <p class="text-muted">Protected data and reliable operations.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Tools -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="mb-4"><i class="fas fa-shield-alt me-2"></i>Security Tools</h2>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-warning bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-fire text-warning"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="mb-1">Check Firewall NAT IP</h5>
+                            <p class="text-muted mb-0">Verify NAT IP configurations on Palo Alto firewalls</p>
+                        </div>
+                        <a href="/get_pa_nat/" class="btn btn-outline-primary">
+                            <i class="fas fa-search me-2"></i>Check
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Getting Started -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-rocket me-2"></i>Quick Start</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                    <span class="fw-bold">1</span>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Apply for IP</h6>
+                                    <small class="text-muted">Request new IP allocations</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                    <span class="fw-bold">2</span>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Process Tickets</h6>
+                                    <small class="text-muted">Split individual or bulk tickets</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                    <span class="fw-bold">3</span>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Manage IPs</h6>
+                                    <small class="text-muted">Delete unused IP addresses</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock body %}
