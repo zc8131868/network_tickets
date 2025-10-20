@@ -28,6 +28,7 @@ from auto_tickets.views.ip_deletion import ip_deletion
 from auto_tickets.views.login import login_view, logout_view
 from auto_tickets.views.get_pa_nat import get_pa_nat
 from auto_tickets.views.auto_tickets_pa import auto_tickets_pa
+from auto_tickets.views.mercury_chat import mercury_chat_view, mercury_chat_api
 
 
 
@@ -46,6 +47,8 @@ urlpatterns = [
     path('accounts/logout/', logout_view, name='logout'),
     path('get_pa_nat/', get_pa_nat, name='get_pa_nat'),
     path('auto_tickets_pa/', auto_tickets_pa, name='auto_tickets_pa'),
+    path('mercury_chat/', mercury_chat_view, name='mercury_chat'),
+    path('mercury_chat_api/', mercury_chat_api, name='mercury_chat_api'),
 ]
 
 

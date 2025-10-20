@@ -39,4 +39,4 @@ if __name__ == "__main__":
     # res = IPDB.objects.all()
     # for i in res:
     #     print(i.device)
-    IPDB.objects.create(ip='10.0.20.0', mask='255.255.254.0', traffic_oam='NA', location='PrivateCloud', device='DMZ SW02')
+    IPDB.objects.create(ip='10.0.137.0', mask='255.255.255.0', traffic_oam='NA', location='PrivateCloud-GNC', device='T01-DR-CORE-SW01')

@@ -265,7 +265,7 @@ def tickets_split(source_ip, destination_ip):
     
     elif source_device == 'M09-CORE-SW01' and destination_device == 'T01-DR-CORE-SW01':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-GNC':
-            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud'
     
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'M09-INT-SW01':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud':
@@ -448,7 +448,7 @@ def tickets_split(source_ip, destination_ip):
 
     elif source_device == 'T01-DR-CORE-SW01' and destination_device == 'M09-CORE-SW01':
         if source_location == 'PrivateCloud-GNC' and destination_location == 'PrivateCloud':
-            return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
     
     elif source_device == 'M09-INT-SW01' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud':
@@ -654,7 +654,7 @@ def generate_subnet(network, num_ip_addresses, existing_subnets=None):
 
 
 import re
-# from netmiko import ConnectHandler  # Commented out due to missing netmiko module
+from netmiko import ConnectHandler
 
 
 def get_nat_config(target_ip):
@@ -692,9 +692,9 @@ def get_nat_config(target_ip):
 
 #Auto Tickets PA
 import re
-from netmiko import ConnectHandler  # Commented out due to missing netmiko module
-from time import sleep  # Commented out due to missing dependencies
-import openpyxl  # Commented out due to missing dependencies
+from netmiko import ConnectHandler
+from time import sleep
+import openpyxl
 import django
 import os
 import sys

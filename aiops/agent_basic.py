@@ -16,9 +16,8 @@ external_client = AsyncOpenAI(
 
 async def simple_question(question):
     agent = Agent(name='Assistant',
-                model=OpenAIChatCompletionsModel(model='gpt-5-nano', openai_client=external_client),
-                model_settings=ModelSettings(temperature=1.0),
-                instructions='You are a helpful assistant that can answer questions and help with tasks.')
+                model=OpenAIChatCompletionsModel(model='gpt-5-mini', openai_client=external_client),
+                instructions='You are a helpful assistant that can answer questions and help with tasks.If you need to do some network troubleshooting, you can do it by yourself, and then report the result to the user.')
     
     result = await Runner.run(agent, question)
     return result.final_output
@@ -26,6 +25,6 @@ async def simple_question(question):
 if __name__ == '__main__':
     import asyncio
 
-    question = 'What is the capital of France?'
+    question = 'I am on wifi and my OS is windows 10, help me check my network health and speed'
     result = asyncio.run(simple_question(question))
     print(result)
