@@ -58,7 +58,7 @@ def multi_split(request):
                     
                     for message in result_list:
                         # More specific error detection to avoid false positives
-                        if any(keyword in message.lower() for keyword in ['failed:', 'traceback:', 'validation failed', 'connection failed', 'error:']):
+                        if message and any(keyword in message.lower() for keyword in ['failed:', 'traceback:', 'validation failed', 'connection failed', 'error:']):
                             error_messages.append(message)
                     
                     # Return results with error messages

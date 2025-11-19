@@ -555,6 +555,8 @@ def tickets_split(source_ip, destination_ip):
     elif source_device == 'M09-INT-SW01' and destination_device == 'M09-INT-SW01':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud'
+        elif source_location == 'PrivateCloud-GNC' and destination_location == 'PrivateCloud-GNC':
+            return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud'
     
     elif source_device == 'M09-SB-SW01' and destination_device == 'M09-SB-SW01':
         if source_location == 'South Base' and destination_location == 'South Base':

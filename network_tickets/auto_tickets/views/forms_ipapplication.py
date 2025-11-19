@@ -38,7 +38,7 @@ class IPApplicationForm(forms.Form):
 
     number = forms.ChoiceField(
         label='Desired IP Number',
-        choices=[('6', '6'), ('14', '14'), ('30', '30')],
+        choices=[('6', '6'), ('14', '14'), ('30', '30'), ('62', '62')],
         required=True,
         widget=forms.Select(attrs={
             'class': 'form-select',

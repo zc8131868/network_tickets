@@ -38,7 +38,7 @@ def auto_tickets_pa(request):
                     
                     for message in result_list:
                         # More specific error detection to avoid false positives
-                        if any(keyword in message.lower() for keyword in ['failed:',  'traceback:', 'validation failed', 'connection failed']):
+                        if message and any(keyword in message.lower() for keyword in ['failed:',  'traceback:', 'validation failed', 'connection failed']):
                             error_messages.append(message)
                     
                     # Return results with error messages
