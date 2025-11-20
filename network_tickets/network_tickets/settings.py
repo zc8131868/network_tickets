@@ -148,3 +148,26 @@ MEDIA_URL = '/media/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Network speed monitor configuration
+NETWORK_SPEED_SITES = [
+    {
+        "name": "CMHK Portal",
+        "url": "https://www.hk.chinamobile.com",
+    },
+    {
+        "name": "Google",
+        "url": "https://www.google.com",
+    },
+    {
+        "name": "ITSR",
+        "url": "https://ncoa.cmhktry.com/todo/center?lang=en-US&open_in_browser=true&tenantID=cmhk&version=0.1.6&from=workplace_home",
+    },
+]
+
+NETWORK_SPEED_THRESHOLDS = {
+    "good": 300,   # ms
+    "warning": 800,  # ms
+}
+
+NETWORK_SPEED_TIMEOUT = 5  # seconds

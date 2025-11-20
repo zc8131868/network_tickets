@@ -3,6 +3,8 @@
     IT Network Tools - Home
 {% endblock title %}
 
+{% load static %}
+
 {% block body %}
 <div class="page-header animate-fade-in">
     <div class="container">
@@ -16,6 +18,65 @@
 </div>
 
 <div class="container">
+    <!-- Device Information -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0"><i class="fas fa-info-circle me-2"></i>Device Information</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="device-info-container">
+                        <div class="col-md-3 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-3 me-3">
+                                    <i class="fas fa-globe text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Public IP</h6>
+                                    <p class="text-muted mb-0" id="device-public-ip">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-info bg-opacity-10 rounded-circle p-3 me-3">
+                                    <i class="fas fa-network-wired text-info"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Private IP</h6>
+                                    <p class="text-muted mb-0" id="device-private-ip">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-success bg-opacity-10 rounded-circle p-3 me-3">
+                                    <i class="fas fa-building text-success"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Service Provider</h6>
+                                    <p class="text-muted mb-0" id="device-isp">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-warning bg-opacity-10 rounded-circle p-3 me-3">
+                                    <i class="fas fa-laptop text-warning"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-1">Browser Info</h6>
+                                    <p class="text-muted mb-0" id="device-browser">Loading...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Quick Actions -->
     <div class="row mb-5">
         <div class="col-12">
@@ -71,62 +132,58 @@
         </div>
     </div>
 
-    <!-- Features Overview -->
+    <!-- Network Speed Monitor (replaces Features) -->
     <div class="row mb-5">
-        <div class="col-12">
-            <h2 class="mb-4"><i class="fas fa-star me-2"></i>Features</h2>
-        </div>
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-primary bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-search text-primary"></i>
-                        </div>
-                        <h5 class="mb-0">IP Management</h5>
-                    </div>
-                    <p class="text-muted">Comprehensive IP database with location tracking.</p>
+        <div class="col-12 mb-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between">
+                <div>
+                    <h2 class="mb-2"><i class="fas fa-tachometer-alt me-2"></i>Network Speed Monitor</h2>
+                </div>
+                <div class="text-end">
+                    <button id="network-speed-refresh" class="btn btn-primary">
+                        <i class="fas fa-sync-alt me-2"></i>Test Now
+                    </button>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap gap-4 mt-4">
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-success me-2">&nbsp;</span> <span class="text-white-50">Good (&lt; {{ network_speed_thresholds.good|default:300 }} ms)</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-warning me-2">&nbsp;</span> <span class="text-white-50">Medium (&lt; {{ network_speed_thresholds.warning|default:800 }} ms)</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-danger me-2">&nbsp;</span> <span class="text-white-50">Poor (≥ {{ network_speed_thresholds.warning|default:800 }} ms)</span>
                 </div>
             </div>
         </div>
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-success bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-file-excel text-success"></i>
+        <div class="row" id="network-speed-list">
+            {% if network_speed_sites %}
+                {% for site in network_speed_sites %}
+                    <div class="col-lg-6 col-md-12 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <h5 class="mb-1"><a href="{{ site.url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">{{ site.name }}</a></h5>
+                                    </div>
+                                    <span class="badge bg-secondary text-uppercase fw-semibold">Pending test</span>
+                                </div>
+                                <p class="text-muted mb-0">Press "Test Now" to measure latency.</p>
+                            </div>
                         </div>
-                        <h5 class="mb-0">Excel Integration</h5>
                     </div>
-                    <p class="text-muted">Bulk processing with Excel templates.</p>
+                {% endfor %}
+            {% else %}
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        No monitoring sites configured. Update `NETWORK_SPEED_SITES` in settings.
+                    </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-warning bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-cogs text-warning"></i>
-                        </div>
-                        <h5 class="mb-0">Automated Processing</h5>
-                    </div>
-                    <p class="text-muted">Smart IP matching and ticket splitting.</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-6 mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="bg-info bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-shield-alt text-info"></i>
-                        </div>
-                        <h5 class="mb-0">Secure & Reliable</h5>
-                    </div>
-                    <p class="text-muted">Protected data and reliable operations.</p>
-                </div>
-            </div>
+        <div class="text-muted small mt-2">
+            Last tested: <span id="network-speed-updated">Not tested yet</span>
         </div>
     </div>
 
@@ -203,4 +260,10 @@
         </div>
     </div>
 </div>
+{{ network_speed_sites|json_script:"network-speed-sites-data" }}
+{{ network_speed_thresholds|json_script:"network-speed-thresholds-data" }}
+{{ network_speed_timeout|json_script:"network-speed-timeout-data" }}
+{% if client_ip %}{{ client_ip|json_script:"client-ip-data" }}{% endif %}
+<script src="{% static 'js/device_info.js' %}?v=6"></script>
+<script src="{% static 'js/network_speed.js' %}?v=2"></script>
 {% endblock body %}
