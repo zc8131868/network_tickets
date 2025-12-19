@@ -14,6 +14,7 @@
   const thresholds = thresholdsElement ? JSON.parse(thresholdsElement.textContent) : {};
   const timeoutSeconds = timeoutElement ? JSON.parse(timeoutElement.textContent) : 5;
   const timeoutMs = (timeoutSeconds || 5) * 1000;
+  const TEST_ATTEMPTS = 5;
 
   const statusLabels = {
     good: "Good",
@@ -105,7 +106,7 @@
     });
   }
 
-  async function testSite(site) {
+  async function measureLatencyOnce(url) {
     const controller = new AbortController();
     const start = performance.now();
     let latency = null;
@@ -113,7 +114,7 @@
 
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      await fetch(site.url, {
+      await fetch(url, {
         method: "GET",
         mode: "no-cors",
         cache: "no-store",
@@ -126,14 +127,35 @@
       clearTimeout(timeoutId);
     }
 
-    const status = classifyLatency(latency);
+    return { latency, error };
+  }
+
+  async function testSite(site) {
+    const latencies = [];
+    let lastError = null;
+
+    for (let attempt = 0; attempt < TEST_ATTEMPTS; attempt += 1) {
+      const { latency, error } = await measureLatencyOnce(site.url);
+      if (latency !== null) {
+        latencies.push(latency);
+      } else if (error) {
+        lastError = error;
+      }
+    }
+
+    const averagedLatency =
+      latencies.length > 0
+        ? Math.round((latencies.reduce((sum, val) => sum + val, 0) / latencies.length) * 100) / 100
+        : null;
+
+    const status = classifyLatency(averagedLatency);
     return {
       name: site.name || site.url,
       url: site.url,
-      latency_ms: latency,
+      latency_ms: averagedLatency,
       status,
       color: statusToColor(status),
-      error,
+      error: averagedLatency === null ? lastError || "All attempts failed" : null,
     };
   }
 
