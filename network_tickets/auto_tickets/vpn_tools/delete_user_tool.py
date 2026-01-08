@@ -44,7 +44,8 @@ except requests.exceptions.RequestException as e:
     print(f'Error: {e}')
 
 ##################################################### delete user ########################################################################################
-def call_delete_user_api(vendor_openid):
+def call_delete_user_api(vendor_email):
+    vendor_openid = get_manager_id(vendor_email)
     url = f'{endpoint}/api/open/v1/user/status/update'
     header = {
         'Authorization': token,
@@ -74,3 +75,23 @@ if __name__ == '__main__':
         print('User deleted successfully')
     else:
         print(f'Error: {res}')
+
+
+#####################################################get manager id######################################################################################
+def get_manager_id(manager_email):
+    url = f'{endpoint}/api/open/v1/user/get_id'
+    header = {
+        'Authorization': token,
+    }
+
+    payload = {
+        'email': manager_email,
+    }
+    try:
+        response = requests.post(url, json=payload, headers=header)
+        response.raise_for_status()
+        res = response.json()
+        return res['data']['id']
+    except requests.exceptions.RequestException as e:
+        print(f'Error: {e}')    
+        return None

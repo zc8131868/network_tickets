@@ -2,6 +2,16 @@ import requests
 import openpyxl
 import re
 
+# Phone number validation patterns
+# Supports: 11-digit mainland China numbers, +852/HK 8-digit, +86/86 11-digit
+PHONE_PATTERN = re.compile(
+    r'^('
+    r'\+?852\d{8}|'      # Hong Kong: +85212345678 or 85212345678
+    r'\+?86\d{11}|'      # China with country code: +8613800138000 or 8613800138000
+    r'\d{11}'            # Mainland China: 13800138000
+    r')$'
+)
+
 
 
 #################################################### get token ########################################################################################
@@ -43,9 +53,32 @@ try:
 except requests.exceptions.RequestException as e:
     print(f'Error: {e}')
 
+#####################################################get manager id######################################################################################
+def get_manager_id(manager_email):
+    url = f'{endpoint}/api/open/v1/user/get_id'
+    header = {
+        'Authorization': token,
+    }
 
+    payload = {
+        'email': manager_email,
+    }
+    try:
+        response = requests.post(url, json=payload, headers=header)
+        response.raise_for_status()
+        res = response.json()
+        return res['data']['id']
+    except requests.exceptions.RequestException as e:
+        print(f'Error: {e}')    
+        return None
 #################################################### create user ########################################################################################
-def call_create_user_api(vendor_name, vendor_email, phone_number, manager_id):
+def call_create_user_api(vendor_name, vendor_email, phone_number, manager_email):
+    manager_id = get_manager_id(manager_email)
+    
+    if manager_id is None:
+        print(f'Failed to get manager id for {manager_email}')
+        return False
+    
     url = f'{endpoint}/api/open/v1/user/create'
     header = {
         'Authorization': token,
@@ -69,28 +102,34 @@ def call_create_user_api(vendor_name, vendor_email, phone_number, manager_id):
         if 'data' in result:
             if isinstance(result['data'], dict) and 'result' in result['data']:
                 if result['data']['result'] == 'success':
-                    return result['data']['id']
+                    return {'success': True, 'user_id': result['data']['id'], 'error': None}
                 else:
                     error_msg = result.get('message', 'Unknown error')
                     print(f'{vendor_name}: {error_msg}')
-                    return False
+                    return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
             else:
                 # 'data' exists but doesn't have 'result' key - might be a different response structure
-                print(f'Unexpected response structure: {result}')
-                return False
+                error_msg = f'Unexpected response structure: {result}'
+                print(error_msg)
+                return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
         else:
             # No 'data' key - check for error message or other structure
             if 'message' in result:
-                print(f'{vendor_name}: {result["message"]}')
+                error_msg = f'{vendor_name}: {result["message"]}'
+                print(error_msg)
+                return {'success': False, 'user_id': None, 'error': error_msg}
             else:
-                print(f'Unexpected response format: {result}')
-            return False
+                error_msg = f'Unexpected response format: {result}'
+                print(error_msg)
+                return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
     except requests.exceptions.RequestException as e:
-        print(f'{vendor_name}: {e}')
-        return None
+        error_msg = f'{vendor_name}: {e}'
+        print(error_msg)
+        return {'success': False, 'user_id': None, 'error': error_msg}
     except KeyError as e:
-        print(f'KeyError: Missing key {e} in response: {result}')
-        return None
+        error_msg = f'KeyError: Missing key {e} in response: {result}'
+        print(error_msg)
+        return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
 
 
 def create_vpn_user_tool(wb):
@@ -106,67 +145,117 @@ def create_vpn_user_tool(wb):
         exit(1)
 
     ticket_number_dic = {}
-    manager_id_dic = {}
+    manager_email_dic = {}
     vendor_name_dic = {}
     vendor_email_dic = {}
     phone_number_dic = {}
+    validation_errors = []
 
     for row in range(start_row, end_row + 1):
         print(f'row: {row}')
 
         ticket_number = sheet.cell(row=row, column=1).value
-        manager_id = sheet.cell(row=row, column=2).value
+        manager_email = sheet.cell(row=row, column=2).value
         vendor_name = sheet.cell(row=row, column=3).value
         vendor_email = sheet.cell(row=row, column=4).value
         phone_number = sheet.cell(row=row, column=5).value
 
+        # Skip empty rows
+        if not any([ticket_number, manager_email, vendor_name, vendor_email, phone_number]):
+            continue
+
+        row_errors = []
+        
         if ticket_number is not None:
             ticket_number_dic[row] = str(ticket_number)
         else:
-            print(f'Ticket number is not found in row {row}')
-            exit(1)
+            error_msg = f'Row {row}: Ticket number is not found'
+            print(error_msg)
+            row_errors.append(error_msg)
 
         if phone_number is not None:
-            if re.search(r'^[0-9]{11}$', str(phone_number)):
-                phone_number_dic[row] = str(phone_number).replace(' ', '')
+            # Clean phone number (remove spaces, dashes, parentheses)
+            cleaned_phone = re.sub(r'[\s\-\(\)]', '', str(phone_number))
+            
+            # Validate phone number format
+            if PHONE_PATTERN.match(cleaned_phone):
+                phone_number_dic[row] = cleaned_phone
             else:
-                print(f'Invalid phone number: {phone_number}')
-                exit(1)
+                vendor_display = vendor_name if vendor_name else f'Row {row}'
+                error_msg = f'{vendor_display}: 手机号格式错误 (Invalid phone number format: {phone_number}). Expected: 11-digit mainland China number, +852 + 8-digit HK number, or +86 + 11-digit China number'
+                print(error_msg)
+                row_errors.append(error_msg)
         else:
-            print(f'Phone number is not found in row {row}')
-            exit(1)
+            vendor_display = vendor_name if vendor_name else f'Row {row}'
+            error_msg = f'{vendor_display}: Phone number is not found'
+            print(error_msg)
+            row_errors.append(error_msg)
 
-        if manager_id is not None:
-            manager_id_dic[row] = manager_id.lower().replace(' ', '')
+        if manager_email is not None:
+            if re.search(r'^[a-zA-Z0-9._%+-]+@hk\.chinamobile\.com$', manager_email):
+                manager_email_dic[row] = manager_email
+            else:
+                error_msg = f'Row {row}: Invalid email format ({manager_email})'
+                print(error_msg)
+                row_errors.append(error_msg)
         else:
-            print(f'Manager ID is not found in row {row}')
-            exit(1)
+            error_msg = f'Row {row}: Manager email is not found'
+            print(error_msg)
+            row_errors.append(error_msg)
+
 
         if vendor_name is not None:
             vendor_name_dic[row] = vendor_name.replace(' ', '')
         else:
-            print(f'Vendor name is not found in row {row}')
-            exit(1)
+            error_msg = f'Row {row}: Vendor name is not found'
+            print(error_msg)
+            row_errors.append(error_msg)
 
         if vendor_email is not None:
             if re.search(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', vendor_email):
                 vendor_email_dic[row] = vendor_email
             else:
-                print(f'Invalid email: {vendor_email}')
-                exit(1)
+                vendor_display = vendor_name if vendor_name else f'Row {row}'
+                error_msg = f'{vendor_display}: Invalid email format ({vendor_email})'
+                print(error_msg)
+                row_errors.append(error_msg)
         else:
-            print(f'Vendor email is not found in row {row}')
-            exit(1)
+            vendor_display = vendor_name if vendor_name else f'Row {row}'
+            error_msg = f'{vendor_display}: Vendor email is not found'
+            print(error_msg)
+            row_errors.append(error_msg)
+        
+        # Only add row to processing if no validation errors
+        if row_errors:
+            validation_errors.extend(row_errors)
+            # Remove row from dictionaries if it was partially added
+            ticket_number_dic.pop(row, None)
+            manager_email_dic.pop(row, None)
+            vendor_name_dic.pop(row, None)
+            vendor_email_dic.pop(row, None)
+            phone_number_dic.pop(row, None)
 
     res = {}
+    errors = []
+    
+    # Add validation errors first
+    errors.extend(validation_errors)
+    
+    # Process valid rows
     for row in range(start_row, end_row + 1):
-        user_id = call_create_user_api(vendor_name_dic[row], vendor_email_dic[row], phone_number_dic[row], manager_id_dic[row])
-        if user_id:
+        if row not in vendor_name_dic:
+            continue  # Skip rows with validation errors
+        
+        result = call_create_user_api(vendor_name_dic[row], vendor_email_dic[row], phone_number_dic[row], manager_email_dic[row])
+        if result['success']:
             print(f'Successful to create an account for {vendor_name_dic[row]}')
-            res[vendor_name_dic[row]] = user_id
+            res[vendor_name_dic[row]] = result['user_id']
         else:
-            print(f'Failed to create an account for {vendor_name_dic[row]}')
-    return res
+            error_msg = result['error'] or f'Failed to create an account for {vendor_name_dic[row]}'
+            print(error_msg)
+            errors.append(error_msg)
+    
+    return {'success': res, 'errors': errors}
 
 
 if __name__ == '__main__':
