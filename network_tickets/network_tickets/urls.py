@@ -29,6 +29,9 @@ from auto_tickets.views.login import login_view, logout_view
 from auto_tickets.views.get_pa_nat import get_pa_nat
 from auto_tickets.views.auto_tickets_pa import auto_tickets_pa
 from auto_tickets.views.auto_vpnnet import auto_vpnnet
+from auto_tickets.views.ticket_management import ticket_management
+from auto_tickets.views.ticket_detail_search import ticket_detail_search
+from auto_tickets.views.serve_itsr_file import serve_itsr_file
 from auto_tickets.views.mercury_chat import mercury_chat_view, mercury_chat_api
 from auto_tickets.views.create_vendor_vpn_account import create_vendor_vpn_account
 from auto_tickets.views.download_vpn_sample import download_vpn_sample
@@ -53,6 +56,9 @@ urlpatterns = [
     path('get_pa_nat/', get_pa_nat, name='get_pa_nat'),
     path('auto_tickets_pa/', auto_tickets_pa, name='auto_tickets_pa'),
     path('auto_vpnnet/', auto_vpnnet, name='auto_vpnnet'),
+    path('ticket_management/', ticket_management, name='ticket_management'),
+    path('ticket_detail_search/', ticket_detail_search, name='ticket_detail_search'),
+    path('itsr_files/<str:filename>', serve_itsr_file, name='serve_itsr_file'),
     path('mercury_chat/', mercury_chat_view, name='mercury_chat'),
     path('mercury_chat_api/', mercury_chat_api, name='mercury_chat_api'),
     path('create_vendor_vpn_account/', create_vendor_vpn_account, name='create_vendor_vpn_account'),

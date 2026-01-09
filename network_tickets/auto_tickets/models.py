@@ -76,3 +76,31 @@ class Vendor_VPN(models.Model):
     
     def __str__(self):
         return f"{self.__class__.__name__}(vendor_name: {self.vendor_name} | vendor_openid: {self.vendor_openid})"
+
+
+class ITSR_Network(models.Model):
+    HANDLER_CHOICES = [
+        ('ZHENG Cheng', 'ZHENG Cheng'),
+        ('Kobe', 'Kobe'),
+        ('Wayne', 'Wayne'),
+    ]
+    
+    TICKET_STATUS_CHOICES = [
+        ('complete', 'Complete'),
+        ('incomplete', 'Incomplete'),
+    ]
+    
+    ITSR_STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('closed', 'Closed'),
+    ]
+    
+    itsr_ticket_number = models.CharField(max_length=100, unique=True, verbose_name='itsr ticket number')
+    requestor = models.CharField(max_length=100, unique=False, verbose_name='requestor')
+    handler = models.CharField(max_length=100, choices=HANDLER_CHOICES, verbose_name='handler')
+    ticket_status = models.CharField(max_length=100, choices=TICKET_STATUS_CHOICES, verbose_name='ticket status')
+    itsr_status = models.CharField(max_length=100, choices=ITSR_STATUS_CHOICES, verbose_name='itsr status')
+    create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
+    
+    def __str__(self):
+        return f"{self.__class__.__name__}(itsr_ticket_number: {self.itsr_ticket_number} | requestor: {self.requestor} | handler: {self.handler} | ticket_status: {self.ticket_status} | itsr_status: {self.itsr_status})"

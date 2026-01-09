@@ -1,0 +1,575 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    <style type="text/css">
+    label.required::before {
+        content: "*";
+        color: red;
+        font-weight: bold;
+        margin-right: 4px;
+    }
+    
+    .ticket-search-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        border: none;
+    }
+    
+    .form-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 1.5rem 2rem;
+        margin: -2.5rem -2.5rem 2rem -2.5rem;
+        border-radius: 1.5rem 1.5rem 0 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    
+    .form-row {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .form-field-frame {
+        background: #f9fafb;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-field-frame:hover {
+        border-color: #667eea;
+        background: #faf5ff;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+    
+    .form-field-frame label {
+        display: block;
+        margin-bottom: 0.75rem;
+    }
+    
+    .form-field-frame .form-text {
+        margin-top: 0.5rem;
+        display: block;
+    }
+    
+    .btn-submit {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 2.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 0.75rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        color: white;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 4rem 0;
+        margin-bottom: 3rem;
+        border-radius: 0 0 3rem 3rem;
+        text-align: center;
+    }
+    
+    .page-header h1 {
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .results-table {
+        background: white;
+        border-radius: 0.75rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+    
+    .results-table-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 1.5rem;
+        font-weight: 600;
+        display: grid;
+        grid-template-columns: 1.5fr 1.2fr 1fr 1fr 1fr 1.2fr 1fr;
+        gap: 1rem;
+        align-items: center;
+    }
+    
+    .results-table-row {
+        display: grid;
+        grid-template-columns: 1.5fr 1.2fr 1fr 1fr 1fr 1.2fr 1fr;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+        align-items: center;
+        transition: background-color 0.2s ease;
+    }
+    
+    .results-table-row:hover {
+        background-color: #f9fafb;
+    }
+    
+    .results-table-row:last-child {
+        border-bottom: none;
+    }
+    
+    .ticket-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+    }
+    
+    .ticket-cell strong {
+        color: #111827;
+        font-weight: 600;
+    }
+    
+    .ticket-cell .text-muted {
+        color: #6b7280;
+        font-size: 0.85rem;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    
+    .status-incomplete {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-complete {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-open {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .status-closed {
+        background: #e5e7eb;
+        color: #374151;
+    }
+    
+    .files-dropdown {
+        position: relative;
+    }
+    
+    .files-toggle {
+        background: #f3f4f6;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+    
+    .files-toggle:hover {
+        background: #e5e7eb;
+        border-color: #667eea;
+    }
+    
+    .files-dropdown-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        min-width: 300px;
+        max-width: 400px;
+        max-height: 300px;
+        overflow-y: auto;
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+    }
+    
+    .files-dropdown.active .files-dropdown-menu {
+        display: block;
+    }
+    
+    .file-item-compact {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        border-bottom: 1px solid #f3f4f6;
+        transition: background-color 0.2s ease;
+    }
+    
+    .file-item-compact:last-child {
+        border-bottom: none;
+    }
+    
+    .file-item-compact:hover {
+        background-color: #f9fafb;
+    }
+    
+    .file-info-compact {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .file-icon-compact {
+        color: #667eea;
+        font-size: 1.1rem;
+    }
+    
+    .file-details-compact {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        flex: 1;
+    }
+    
+    .file-name-compact {
+        font-weight: 500;
+        color: #111827;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .file-meta-compact {
+        font-size: 0.75rem;
+        color: #6b7280;
+    }
+    
+    .btn-update {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 0.4rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+    }
+    
+    .btn-update:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+    
+    .btn-update:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        transform: none;
+    }
+    
+    @media (max-width: 1400px) {
+        .results-table-header,
+        .results-table-row {
+            grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr 0.8fr 1fr 0.8fr;
+            font-size: 0.9rem;
+        }
+    }
+    
+    @media (max-width: 1200px) {
+        .results-table-header,
+        .results-table-row {
+            grid-template-columns: 1fr 0.9fr 0.7fr 0.7fr 0.7fr 0.9fr 0.7fr;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+        }
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 3rem;
+        color: #6b7280;
+    }
+    
+    .no-results i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #d1d5db;
+    }
+    
+    .alert {
+        border-radius: 0.75rem;
+        padding: 1rem 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+    </style>
+{% endblock head %}
+
+{% block title %}
+    Ticket Detail Search
+{% endblock title %}
+
+{% block body %}
+    <div class="page-header">
+        <div class="container">
+            <h1><i class="fas fa-search me-3"></i>Ticket Detail Search</h1>
+            <p>Search for tickets by handler or ticket number</p>
+        </div>
+    </div>
+    
+    <div class="container ticket-search-container">
+        <div class="form-card">
+            <div class="card-header">
+                <i class="fas fa-search me-2"></i>Search Tickets
+            </div>
+            
+            <form action="{% url 'ticket_detail_search' %}" method="post" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="row form-row">
+                    <div class="col-md-4">
+                        <div class="form-field-frame">
+                            <label for="{{ form.handler.id_for_label }}" class="form-label">
+                                <i class="fas fa-user-tie me-2"></i>{{ form.handler.label }}
+                            </label>
+                            {{ form.handler }}
+                            <small class="form-text text-muted">Shows incomplete tickets by default. With ITSR Status filter, shows complete tickets.</small>
+                            {% if form.handler.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.handler.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-field-frame">
+                            <label for="{{ form.itsr_ticket_number.id_for_label }}" class="form-label">
+                                <i class="fas fa-ticket-alt me-2"></i>{{ form.itsr_ticket_number.label }}
+                            </label>
+                            {{ form.itsr_ticket_number }}
+                            <small class="form-text text-muted">Enter a specific ticket number to view its details</small>
+                            {% if form.itsr_ticket_number.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.itsr_ticket_number.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-field-frame">
+                            <label for="{{ form.itsr_status.id_for_label }}" class="form-label">
+                                <i class="fas fa-filter me-2"></i>{{ form.itsr_status.label }}
+                            </label>
+                            {{ form.itsr_status }}
+                            <small class="form-text text-muted">Filter by ITSR status (Open/Closed). Works with Handler search.</small>
+                            {% if form.itsr_status.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.itsr_status.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                
+                <div class="text-center">
+                    <button class="btn btn-submit" type="submit">
+                        <i class="fas fa-search me-2"></i>Search
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% if has_results %}
+            <div class="mb-3">
+                <h3><i class="fas fa-list me-2"></i>Search Results ({{ tickets_with_files|length }})</h3>
+            </div>
+            
+            <div class="results-table">
+                <div class="results-table-header">
+                    <div>Ticket Number</div>
+                    <div>Requestor</div>
+                    <div>Handler</div>
+                    <div>Ticket Status</div>
+                    <div>ITSR Status</div>
+                    <div>Files</div>
+                    <div>Action</div>
+                </div>
+                
+                {% for item in tickets_with_files %}
+                    <div class="results-table-row">
+                        <div class="ticket-cell">
+                            <i class="fas fa-ticket-alt text-primary"></i>
+                            <strong>{{ item.ticket.itsr_ticket_number }}</strong>
+                        </div>
+                        <div class="ticket-cell">
+                            <span>{{ item.ticket.requestor }}</span>
+                        </div>
+                        <div class="ticket-cell">
+                            <span>{{ item.ticket.handler }}</span>
+                        </div>
+                        <div class="ticket-cell">
+                            <span class="status-badge status-{{ item.ticket.ticket_status }}">
+                                {{ item.ticket.get_ticket_status_display }}
+                            </span>
+                        </div>
+                        <div class="ticket-cell">
+                            <span class="status-badge status-{{ item.ticket.itsr_status }}">
+                                {{ item.ticket.get_itsr_status_display }}
+                            </span>
+                        </div>
+                        <div class="ticket-cell">
+                            <div class="files-dropdown" id="files-dropdown-{{ forloop.counter }}">
+                                <div class="files-toggle" data-dropdown-index="{{ forloop.counter }}">
+                                    <i class="fas fa-paperclip"></i>
+                                    <span>{{ item.files|length }} file{{ item.files|length|pluralize }}</span>
+                                    <i class="fas fa-chevron-down" style="font-size: 0.7rem; margin-left: 0.25rem;"></i>
+                                </div>
+                                <div class="files-dropdown-menu">
+                                    {% if item.files %}
+                                        {% for file in item.files %}
+                                            <div class="file-item-compact">
+                                                <div class="file-info-compact">
+                                                    <i class="fas fa-file file-icon-compact"></i>
+                                                    <div class="file-details-compact">
+                                                        <span class="file-name-compact" title="{{ file.name }}">{{ file.name }}</span>
+                                                        <span class="file-meta-compact">
+                                                            {{ file.size|filesizeformat }} • {{ file.date|date:"m/d H:i" }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <a href="{% url 'serve_itsr_file' filename=file.name %}" target="_blank" class="btn btn-sm btn-outline-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="text-muted text-center p-2" style="font-size: 0.85rem;">No files</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ticket-cell">
+                            {% if item.ticket.ticket_status == 'incomplete' %}
+                                <form method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="update_status" value="1">
+                                    <input type="hidden" name="ticket_id" value="{{ item.ticket.id }}">
+                                    <input type="hidden" name="ticket_status" value="complete">
+                                    <input type="hidden" name="handler" value="{{ handler }}">
+                                    <input type="hidden" name="itsr_ticket_number" value="{{ itsr_ticket_number }}">
+                                    <input type="hidden" name="itsr_status" value="{{ itsr_status }}">
+                                    <button type="submit" class="btn btn-update" onclick="return confirm('Mark ticket as complete?');">
+                                        <i class="fas fa-check"></i> Mark as Complete
+                                    </button>
+                                </form>
+                            {% else %}
+                                <button class="btn btn-update" disabled style="background: #9ca3af;">
+                                    <i class="fas fa-check-circle"></i> Mark as Complete
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif request.method == 'POST' or request.GET.handler or request.GET.itsr_ticket_number or request.GET.itsr_status %}
+            <div class="results-table">
+                <div class="no-results" style="padding: 3rem; text-align: center;">
+                    <i class="fas fa-search" style="font-size: 4rem; margin-bottom: 1rem; color: #d1d5db;"></i>
+                    <h4>No tickets found</h4>
+                    <p class="text-muted">Please try a different search criteria.</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle file dropdown toggles
+        document.querySelectorAll('.files-toggle').forEach(function(toggle) {
+            toggle.addEventListener('click', function() {
+                const index = this.getAttribute('data-dropdown-index');
+                const dropdown = document.getElementById('files-dropdown-' + index);
+                dropdown.classList.toggle('active');
+                
+                // Close other dropdowns
+                document.querySelectorAll('.files-dropdown').forEach(function(d) {
+                    if (d.id !== 'files-dropdown-' + index) {
+                        d.classList.remove('active');
+                    }
+                });
+            });
+        });
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.files-dropdown')) {
+                document.querySelectorAll('.files-dropdown').forEach(function(d) {
+                    d.classList.remove('active');
+                });
+            }
+        });
+    });
+    </script>
+    
+{% endblock body %}

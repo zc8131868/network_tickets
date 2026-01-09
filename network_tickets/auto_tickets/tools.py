@@ -162,14 +162,14 @@ def tickets_split(source_ip, destination_ip):
 
     elif source_device == 'DMZ SW01' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'SN OAM' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+            return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
         elif source_location == 'AliCloud' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR\n 4)AliCloud'
+            return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR\n 4)AliCloud'
         elif source_location == 'AliCloud-Mylink' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to AliCloud-Mylink, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
+            return f'{source_ip} belongs to AliCloud-Mylink, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
         ####################Taiping big data###############################
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud'
     ###############################################################
     elif source_device == 'DMZ SW01' and destination_device == 'M09-INT-SW01':
         if source_location == 'SN OAM' and destination_location == 'PrivateCloud':
@@ -218,7 +218,7 @@ def tickets_split(source_ip, destination_ip):
             return f'{source_ip} belongs to AliCloud-Mylink, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
         ####################Taiping big data###############################
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-GNC':
-            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR\n 4)AliCloud'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
         ###################################################################
 
     elif source_device == 'DMZ SW02' and destination_device == 'M09-CORE-SW01':
@@ -231,11 +231,11 @@ def tickets_split(source_ip, destination_ip):
 
     elif source_device == 'DMZ SW02' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'SN PCloud' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+            return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
         elif source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
         elif source_location == 'NewPrivateCloud' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to NewPrivateCloud, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to NewPrivateCloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
         
     elif source_device == 'DMZ SW02' and destination_device == 'M09-INT-SW01':
         if source_location == 'SN PCloud' and destination_location == 'PrivateCloud':
@@ -276,7 +276,7 @@ def tickets_split(source_ip, destination_ip):
 
     elif source_device == 'M09-CORE-SW01' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     
     elif source_device == 'M09-CORE-SW01' and destination_device == 'M09-INT-SW01':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud':
@@ -299,7 +299,7 @@ def tickets_split(source_ip, destination_ip):
     
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'M09-INT-SW01':
         if source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'M09-SB-SW01':
         if source_location == 'PrivateCloud-TP' and destination_location == 'South Base':
@@ -307,13 +307,13 @@ def tickets_split(source_ip, destination_ip):
     
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'PA':
         if source_location == 'PrivateCloud-TP' and destination_location == 'South Base':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to South Base. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)South Base (IT will provide support)'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to South Base. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)South Base (IT will provide support)'
         elif source_location == 'PrivateCloud-TP' and destination_location == 'SN PCloud':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)EOMS-Cloud'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)EOMS-Cloud'
             
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'T01-DR-CORE-SW01':
         if source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-GNC':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     
     elif source_device == 'M09-INT-SW01' and destination_device == 'M09-SB-SW01':
         if source_location == 'PrivateCloud' and destination_location == 'South Base':
@@ -355,14 +355,13 @@ def tickets_split(source_ip, destination_ip):
             return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
         ############################################################################################
         #############################Taiping big data###############################################
-        elif source_location == 'NewPrivateCloud' and destination_location == 'AliCloud':
-            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
-        elif source_location == 'PrivateCloud' and destination_location == 'AliCloud':
-            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
-        elif source_location == 'SN PCloud' and destination_location == 'AliCloud':
-            return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)AliCloud'
+        elif source_location == 'NewPrivateCloud' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
+        elif source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
+        elif source_location == 'SN PCloud' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
         ############################################################################################
-
 
     elif source_device == 'M09-CORE-SW01' and destination_device == 'DMZ SW01':
         if source_location == 'PrivateCloud' and destination_location == 'SN OAM':
@@ -372,13 +371,25 @@ def tickets_split(source_ip, destination_ip):
         elif source_location == 'PrivateCloud' and destination_location == 'AliCloud-Mylink':
             return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
 
+    ############################################################################################
+    #####################################Taiping big data#######################################
+        elif source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN\n 3)ITSR'
+    ############################################################################################
+    
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'DMZ SW01':
         if source_location == 'PrivateCloud-TP' and destination_location == 'SN OAM':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
         elif source_location == 'PrivateCloud-TP' and destination_location == 'AliCloud':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR\n 4)AliCloud'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR\n 4)AliCloud'
         elif source_location == 'PrivateCloud-TP' and destination_location == 'AliCloud-Mylink':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
+
+    ############################################################################################
+    #####################################Taiping big data#######################################
+        elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud'
+    ############################################################################################
 
     elif source_device == 'M09-INT-SW01' and destination_device == 'DMZ SW01':
         if source_location == 'PrivateCloud' and destination_location == 'SN OAM':
@@ -387,15 +398,23 @@ def tickets_split(source_ip, destination_ip):
             return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR\n 4)AliCloud'
         elif source_location == 'PrivateCloud' and destination_location == 'AliCloud-Mylink':
             return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
-
+    ############################################################################################
+    #####################################Taiping big data#######################################
+        elif source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+    ############################################################################################
+    
     elif source_device == 'M09-SB-SW01' and destination_device == 'DMZ SW01':
         if source_location == 'South Base' and destination_location == 'SN OAM':
             return f'{source_ip} belongs to South Base, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)'
         elif source_location == 'South Base' and destination_location == 'AliCloud':
             return f'{source_ip} belongs to South Base, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)AliCloud'
-        # elif source_location == 'South Base' and destination_location == 'AliCloud-Mylink':
-        #     return f'{source_ip} belongs to South Base, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)AliCloud'
-
+    ############################################################################################
+    #####################################Taiping big data#######################################
+        elif source_location == 'South Base' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to South Base, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)EOMS-Cloud'
+    ############################################################################################
+    
     elif source_device == 'PA' and destination_device == 'DMZ SW01':
         if source_location == 'South Base' and destination_location == 'SN OAM':
             return f'{source_ip} belongs to South Base, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)'
@@ -403,7 +422,13 @@ def tickets_split(source_ip, destination_ip):
             return f'{source_ip} belongs to South Base, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)AliCloud'
         elif source_location == 'SN PCloud' and destination_location == 'AliCloud':
             return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)AliCloud\n 4)EOMS-Cloud'
-
+    ############################################################################################
+    #####################################Taiping big data#######################################
+        elif source_location == 'South Base' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to South Base, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)EOMS-Cloud'
+        elif source_location == 'SN PCloud' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)EOMS-Cloud'
+    ############################################################################################
     elif source_device == 'T01-DR-CORE-SW01' and destination_device == 'DMZ SW01':
         if source_location == 'PrivateCloud-GNC' and destination_location == 'SN OAM':
             return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
@@ -412,6 +437,11 @@ def tickets_split(source_ip, destination_ip):
         elif source_location == 'PrivateCloud-GNC' and destination_location == 'AliCloud-Mylink':
             return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)AliCloud'
 
+    ############################################################################################
+    #####################################Taiping big data#######################################
+        elif source_location == 'PrivateCloud-GNC' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+    ############################################################################################
     elif source_device == 'M09-CORE-SW01' and destination_device == 'DMZ SW02':
         if source_location == 'PrivateCloud' and destination_location == 'SN PCloud':
             return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
@@ -422,11 +452,11 @@ def tickets_split(source_ip, destination_ip):
 
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'DMZ SW02':
         if source_location == 'PrivateCloud-TP' and destination_location == 'SN PCloud':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
         elif source_location == 'PrivateCloud-TP' and destination_location == 'NewPrivateCloud':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to NewPrivateCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to NewPrivateCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
         
     elif source_device == 'M09-INT-SW01' and destination_device == 'DMZ SW02':
         if source_location == 'PrivateCloud' and destination_location == 'SN PCloud':
@@ -469,7 +499,7 @@ def tickets_split(source_ip, destination_ip):
 
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'M09-CORE-SW01':
         if source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     
     elif source_device == 'M09-INT-SW01' and destination_device == 'M09-CORE-SW01':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud':
@@ -491,21 +521,21 @@ def tickets_split(source_ip, destination_ip):
     
     elif source_device == 'M09-INT-SW01' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to Private Cloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     
     elif source_device == 'M09-SB-SW01' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'South Base' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to South Base, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)South Base (IT will provide support)'
+            return f'{source_ip} belongs to South Base, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)South Base (IT will provide support)'
     
     elif source_device == 'PA' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'South Base' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to South Base, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)South Base (IT will provide support)'
+            return f'{source_ip} belongs to South Base, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)South Base (IT will provide support)'
         elif source_location == 'SN PCloud' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+            return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
 
     elif source_device == 'T01-DR-CORE-SW01' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'PrivateCloud-GNC' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+            return f'{source_ip} belongs to PrivateCloud-GNC, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     
     elif source_device == 'M09-SB-SW01' and destination_device == 'M09-INT-SW01':
         if source_location == 'South Base' and destination_location == 'PrivateCloud':
@@ -562,6 +592,22 @@ def tickets_split(source_ip, destination_ip):
             return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)AliCloud'
         elif source_location == 'AliCloud-Mylink' and destination_location == 'AliCloud':
             return f'{source_ip} belongs to AliCloud-Mylink, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)AliCloud'
+        ############################################################################################
+    #####################################Taiping big data#######################################
+        elif source_location == 'AliCloud' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to AliCloud, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-SN \n 2)AliCloud\n 3)EOMS-Cloud'
+        elif source_location == 'SN OAM' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-SN \n 2)EOMS-Cloud'
+        elif source_location == 'AliCloud-Mylink' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to AliCloud-Mylink, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-SN \n 2)AliCloud\n 3)EOMS-Cloud'
+        elif source_location == 'PrivateCloud-TP' and destination_location == 'AliCloud':
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-SN \n 2)AliCloud\n 3)EOMS-Cloud'
+        elif source_location == 'PrivateCloud-TP' and destination_location == 'SN OAM':
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-SN \n 2)EOMS-Cloud'
+        elif source_location == 'PrivateCloud-TP' and destination_location == 'AliCloud-Mylink':
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-SN \n 2)AliCloud\n 3)EOMS-Cloud'    
+    ############################################################################################
+    
     
     elif source_device == 'DMZ SW02' and destination_device == 'DMZ SW02':
         if source_location == 'NewPrivateCloud' and destination_location == 'NewPrivateCloud':
@@ -589,7 +635,7 @@ def tickets_split(source_ip, destination_ip):
     
     elif source_device == 'M09-EXT-CORE-SW1' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-TP':
-            return f'{source_ip} belongs to Private Cloud TP, {destination_ip} belongs to Private Cloud TP. Tickets contain: \n 1)EOMS-Cloud'
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud'
     
     elif source_device == 'M09-INT-SW01' and destination_device == 'M09-INT-SW01':
         if source_location == 'PrivateCloud' and destination_location == 'PrivateCloud':

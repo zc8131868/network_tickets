@@ -1,0 +1,361 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    {# 为了在Form中添加必选项的星,需要添加的css #}
+    <style type="text/css">
+    label.required::before {
+        content: "*";
+        color: red;
+        font-weight: bold;
+        margin-right: 4px;
+    }
+    
+    /* Enhanced styling for Ticket Management page */
+    .ticket-management-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        border: none;
+    }
+    
+    .form-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 1.5rem 2rem;
+        margin: -2.5rem -2.5rem 2rem -2.5rem;
+        border-radius: 1.5rem 1.5rem 0 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    
+    .form-row {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 1rem;
+        border: 2px solid #e5e7eb;
+        padding: 1rem 1.25rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        background-color: #f9fafb;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.3rem rgba(102, 126, 234, 0.15);
+        background-color: white;
+        transform: translateY(-1px);
+    }
+    
+    .btn-submit {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 1rem;
+        padding: 1rem 2.5rem;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        margin-top: 1rem;
+    }
+    
+    .btn-submit:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 25px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+    
+    .result-card {
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        margin-top: 2rem;
+        border: none;
+        animation: slideInUp 0.6s ease-out;
+    }
+    
+    .result-card.success {
+        border-left: 5px solid #10b981;
+    }
+    
+    .result-card.error {
+        border-left: 5px solid #ef4444;
+    }
+    
+    .result-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        font-size: 1.4rem;
+        font-weight: 600;
+    }
+    
+    .result-header.success {
+        color: #10b981;
+    }
+    
+    .result-header.error {
+        color: #ef4444;
+    }
+    
+    .success-display {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        border-radius: 1rem;
+        padding: 2rem;
+        margin: 1.5rem 0;
+        border: 2px solid #10b981;
+    }
+    
+    .success-display p {
+        color: #065f46;
+        font-size: 1.1rem;
+        margin: 0;
+        font-weight: 500;
+    }
+    
+    .error-display {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border-radius: 1rem;
+        padding: 2rem;
+        margin: 1.5rem 0;
+        border: 2px solid #ef4444;
+    }
+    
+    .error-display p {
+        color: #991b1b;
+        font-size: 1.1rem;
+        margin: 0;
+        font-weight: 500;
+    }
+    
+    .invalid-feedback {
+        display: block;
+        width: 100%;
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        color: #ef4444;
+    }
+    
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 4rem 0;
+        margin-bottom: 3rem;
+        border-radius: 0 0 3rem 3rem;
+        text-align: center;
+    }
+    
+    .page-header h1 {
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .page-header p {
+        font-size: 1.3rem;
+        opacity: 0.9;
+        margin: 0;
+    }
+    
+    @media (max-width: 768px) {
+        .form-card {
+            padding: 1.5rem;
+            margin: 0 0.5rem 2rem 0.5rem;
+        }
+        
+        .form-card .card-header {
+            margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+            padding: 1rem 1.5rem;
+            font-size: 1.3rem;
+        }
+        
+        .page-header h1 {
+            font-size: 2.2rem;
+        }
+        
+        .page-header p {
+            font-size: 1.1rem;
+        }
+        
+        .success-display, .error-display {
+            padding: 1.5rem;
+        }
+    }
+    </style>
+{% endblock head %}
+
+{% block title %}
+    Ticket Management
+{% endblock title %}
+
+{% block body %}
+    <div class="page-header">
+        <div class="container">
+            <h1><i class="fas fa-ticket-alt me-3"></i>Ticket Management</h1>
+            <p>Create and manage ITSR network tickets</p>
+        </div>
+    </div>
+    
+    <div class="container ticket-management-container">
+        <div class="form-card">
+            <div class="card-header">
+                <i class="fas fa-plus-circle me-2"></i>New Ticket Entry
+            </div>
+            
+            <form action="{% url 'ticket_management' %}" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="row form-row">
+                    <div class="col-md-6">
+                        <label for="{{ form.itsr_ticket_number.id_for_label }}" class="form-label">
+                            <i class="fas fa-ticket-alt me-2"></i>{{ form.itsr_ticket_number.label }}
+                        </label>
+                        {{ form.itsr_ticket_number }}
+                        {% if form.itsr_ticket_number.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.itsr_ticket_number.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label for="{{ form.requestor.id_for_label }}" class="form-label">
+                            <i class="fas fa-user me-2"></i>{{ form.requestor.label }}
+                        </label>
+                        {{ form.requestor }}
+                        {% if form.requestor.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.requestor.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row form-row">
+                    <div class="col-md-4">
+                        <label for="{{ form.handler.id_for_label }}" class="form-label">
+                            <i class="fas fa-user-tie me-2"></i>{{ form.handler.label }}
+                        </label>
+                        {{ form.handler }}
+                        {% if form.handler.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.handler.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.ticket_status.id_for_label }}" class="form-label">
+                            <i class="fas fa-check-circle me-2"></i>{{ form.ticket_status.label }}
+                        </label>
+                        {{ form.ticket_status }}
+                        {% if form.ticket_status.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.ticket_status.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.itsr_status.id_for_label }}" class="form-label">
+                            <i class="fas fa-clipboard-check me-2"></i>{{ form.itsr_status.label }}
+                        </label>
+                        {{ form.itsr_status }}
+                        {% if form.itsr_status.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.itsr_status.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row form-row">
+                    <div class="col-12">
+                        <label for="{{ form.file.id_for_label }}" class="form-label">
+                            <i class="fas fa-file-upload me-2"></i>{{ form.file.label }}
+                        </label>
+                        {{ form.file }}
+                        {% if form.file.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.file.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    <button class="btn btn-submit" type="submit">
+                        <i class="fas fa-save me-2"></i>Save Ticket
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        {% if success_message %}
+            <div class="result-card success">
+                <div class="result-header success">
+                    <i class="fas fa-check-circle me-3"></i>Ticket Saved Successfully
+                </div>
+                <div class="success-display">
+                    <p>
+                        <i class="fas fa-check me-2"></i>{{ success_message }}
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+        
+        {% if error_message %}
+            <div class="result-card error">
+                <div class="result-header error">
+                    <i class="fas fa-exclamation-triangle me-3"></i>Error
+                </div>
+                <div class="error-display">
+                    <p>
+                        <i class="fas fa-times-circle me-2"></i>{{ error_message }}
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+{% endblock body %}
