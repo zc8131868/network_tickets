@@ -4,7 +4,52 @@ from auto_tickets.views.forms_ticket_management import TicketManagementForm
 from auto_tickets.models import ITSR_Network
 import os
 from django.conf import settings
-from datetime import datetime
+from datetime import datetime, timedelta
+import glob
+
+def cleanup_old_files(itsr_files_dir, retention_months=6):
+    """
+    Remove files older than the specified number of months from the itsr_files directory.
+    
+    Args:
+        itsr_files_dir: Path to the itsr_files directory
+        retention_months: Number of months to keep files (default: 6)
+    
+    Returns:
+        tuple: (deleted_count, error_count)
+    """
+    if not os.path.exists(itsr_files_dir):
+        return 0, 0
+    
+    deleted_count = 0
+    error_count = 0
+    cutoff_date = datetime.now() - timedelta(days=retention_months * 30)
+    
+    try:
+        # Get all files in the directory
+        all_files = glob.glob(os.path.join(itsr_files_dir, '*'))
+        
+        for file_path in all_files:
+            if os.path.isfile(file_path):
+                try:
+                    # Get file modification time
+                    file_mtime = os.path.getmtime(file_path)
+                    file_date = datetime.fromtimestamp(file_mtime)
+                    
+                    # Delete if older than cutoff date
+                    if file_date < cutoff_date:
+                        os.remove(file_path)
+                        deleted_count += 1
+                except Exception as e:
+                    # Log error but continue with other files
+                    error_count += 1
+                    print(f"Error deleting file {file_path}: {str(e)}")
+    
+    except Exception as e:
+        print(f"Error during file cleanup: {str(e)}")
+        error_count += 1
+    
+    return deleted_count, error_count
 
 @login_required
 def ticket_management(request):
@@ -16,6 +61,7 @@ def ticket_management(request):
             handler = form.cleaned_data['handler']
             ticket_status = form.cleaned_data['ticket_status']
             itsr_status = form.cleaned_data['itsr_status']
+            description = form.cleaned_data.get('description', '')
             uploaded_file = form.cleaned_data.get('file')
             
             try:
@@ -29,7 +75,18 @@ def ticket_management(request):
                 if uploaded_file:
                     # Create itsr_files directory if it doesn't exist
                     itsr_files_dir = os.path.join(settings.BASE_DIR, 'auto_tickets', 'itsr_files')
-                    os.makedirs(itsr_files_dir, exist_ok=True)
+                    os.makedirs(itsr_files_dir, mode=0o755, exist_ok=True)
+                    
+                    # Check if directory is writable
+                    if not os.access(itsr_files_dir, os.W_OK):
+                        error_message = f'Error saving ticket: Permission denied. The itsr_files directory is not writable. Please contact the administrator.'
+                        return render(request, 'ticket_management.html', {
+                            'form': form,
+                            'error_message': error_message
+                        })
+                    
+                    # Clean up files older than 6 months before saving new file
+                    deleted_count, error_count = cleanup_old_files(itsr_files_dir, retention_months=6)
                     
                     # Generate filename: ticket_number_original_filename_timestamp.ext
                     file_extension = os.path.splitext(uploaded_file.name)[1]
@@ -44,11 +101,23 @@ def ticket_management(request):
                     file_path = os.path.join(itsr_files_dir, filename)
                     
                     # Save the file
-                    with open(file_path, 'wb+') as destination:
-                        for chunk in uploaded_file.chunks():
-                            destination.write(chunk)
-                    
-                    saved_file_path = file_path
+                    try:
+                        with open(file_path, 'wb+') as destination:
+                            for chunk in uploaded_file.chunks():
+                                destination.write(chunk)
+                        saved_file_path = file_path
+                    except PermissionError as pe:
+                        error_message = f'Error saving ticket: Permission denied when writing to {filename}. Please contact the administrator.'
+                        return render(request, 'ticket_management.html', {
+                            'form': form,
+                            'error_message': error_message
+                        })
+                    except OSError as ose:
+                        error_message = f'Error saving ticket: {str(ose)}. Please contact the administrator.'
+                        return render(request, 'ticket_management.html', {
+                            'form': form,
+                            'error_message': error_message
+                        })
                 
                 # Create new ticket entry
                 ITSR_Network.objects.create(
@@ -56,7 +125,8 @@ def ticket_management(request):
                     requestor=requestor,
                     handler=handler,
                     ticket_status=ticket_status,
-                    itsr_status=itsr_status
+                    itsr_status=itsr_status,
+                    description=description
                 )
                 
                 # Reset form and show success message

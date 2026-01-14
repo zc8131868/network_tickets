@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ITSR Token Extractor</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1976d2;
+            margin-top: 0;
+        }
+        .method {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #1976d2;
+            border-radius: 4px;
+        }
+        .method h3 {
+            margin-top: 0;
+            color: #1976d2;
+        }
+        button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 4px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .token-display {
+            background: white;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            font-size: 12px;
+        }
+        .copy-btn {
+            background: #4caf50;
+            font-size: 12px;
+            padding: 5px 10px;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 ITSR Token Extractor</h1>
+        <p>This page helps you extract authentication tokens from your BPM session.</p>
+        
+        <div class="warning">
+            <strong>⚠️ Important:</strong> This page must be opened in the same browser where you're logged into BPM.
+            Open this page in a new tab while keeping your BPM tab open.
+        </div>
+
+        <div class="method">
+            <h3>Method 1: Extract from Network Requests (Most Reliable)</h3>
+            <p>This method captures sy-cinfo from actual network requests made by BPM.</p>
+            <button onclick="extractFromNetwork()">📡 Extract from Network Requests</button>
+            <div id="networkResult" class="result"></div>
+        </div>
+
+        <div class="method">
+            <h3>Method 2: Extract from Cookies & Storage</h3>
+            <p>This method tries to extract tokens from cookies and browser storage.</p>
+            <button onclick="extractFromStorage()">🍪 Extract from Cookies/Storage</button>
+            <div id="storageResult" class="result"></div>
+        </div>
+
+        <div class="method">
+            <h3>Method 3: Manual Copy Helper</h3>
+            <p>Run this script in the BPM page's console (F12 → Console tab):</p>
+            <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px;">// Copy this entire script and paste it in BPM page console (F12)
+(function() {
+    const tokens = {
+        SY_ACCESS_TOKEN: null,
+        SY_UID: null,
+        'sy-cinfo': null
+    };
+    
+    // Try cookies
+    document.cookie.split(';').forEach(c => {
+        const [name, value] = c.trim().split('=');
+        if (name === 'SY_ACCESS_TOKEN') tokens.SY_ACCESS_TOKEN = value;
+        if (name === 'SY_UID') tokens.SY_UID = value;
+        if (name === 'sy-cinfo' || name === 'SY_CINFO') tokens['sy-cinfo'] = value;
+    });
+    
+    // Try localStorage
+    try {
+        if (!tokens.SY_ACCESS_TOKEN) tokens.SY_ACCESS_TOKEN = localStorage.getItem('SY_ACCESS_TOKEN');
+        if (!tokens.SY_UID) tokens.SY_UID = localStorage.getItem('SY_UID');
+        if (!tokens['sy-cinfo']) tokens['sy-cinfo'] = localStorage.getItem('sy-cinfo') || localStorage.getItem('SY_CINFO');
+    } catch(e) {}
+    
+    // Try sessionStorage
+    try {
+        if (!tokens.SY_ACCESS_TOKEN) tokens.SY_ACCESS_TOKEN = sessionStorage.getItem('SY_ACCESS_TOKEN');
+        if (!tokens.SY_UID) tokens.SY_UID = sessionStorage.getItem('SY_UID');
+        if (!tokens['sy-cinfo']) tokens['sy-cinfo'] = sessionStorage.getItem('sy-cinfo') || sessionStorage.getItem('SY_CINFO');
+    } catch(e) {}
+    
+    // Display results
+    console.log('=== Extracted Tokens ===');
+    console.log('SY_ACCESS_TOKEN:', tokens.SY_ACCESS_TOKEN ? tokens.SY_ACCESS_TOKEN.substring(0, 50) + '...' : 'NOT FOUND');
+    console.log('SY_UID:', tokens.SY_UID || 'NOT FOUND');
+    console.log('sy-cinfo:', tokens['sy-cinfo'] || 'NOT FOUND');
+    
+    // Copy to clipboard
+    const text = `SY_ACCESS_TOKEN: ${tokens.SY_ACCESS_TOKEN || 'NOT FOUND'}\nSY_UID: ${tokens.SY_UID || 'NOT FOUND'}\nsy-cinfo: ${tokens['sy-cinfo'] || 'NOT FOUND'}`;
+    navigator.clipboard.writeText(text).then(() => {
+        console.log('✓ Tokens copied to clipboard!');
+        alert('Tokens copied to clipboard! Check console for details.');
+    }).catch(() => {
+        console.log('Could not copy to clipboard. Copy manually from above.');
+    });
+    
+    return tokens;
+})();</pre>
+        </div>
+    </div>
+
+    <script>
+        // Method 1: Extract from Network Requests
+        function extractFromNetwork() {
+            const resultDiv = document.getElementById('networkResult');
+            resultDiv.innerHTML = '<p>⏳ Monitoring network requests... Please make a request in your BPM tab (refresh or navigate).</p>';
+            resultDiv.classList.add('show');
+            
+            // This won't work from a different origin, but we can provide instructions
+            resultDiv.innerHTML = `
+                <div class="warning">
+                    <strong>⚠️ Cross-origin restriction:</strong> This page cannot directly access BPM's network requests due to browser security.
+                </div>
+                <p><strong>Manual steps:</strong></p>
+                <ol>
+                    <li>Go to your BPM tab</li>
+                    <li>Open DevTools (F12) → Network tab</li>
+                    <li>Make a request (refresh page or navigate)</li>
+                    <li>Find any request to <code>bpm.cmhktry.com</code></li>
+                    <li>Click it → Headers tab → Look for <code>sy-cinfo:</code> in Request Headers</li>
+                    <li>Copy that value</li>
+                </ol>
+            `;
+        }
+
+        // Method 2: Extract from Cookies & Storage
+        function extractFromStorage() {
+            const resultDiv = document.getElementById('storageResult');
+            const tokens = {
+                SY_ACCESS_TOKEN: null,
+                SY_UID: null,
+                'sy-cinfo': null
+            };
+            
+            // Try to get from cookies (only works for same-origin)
+            try {
+                document.cookie.split(';').forEach(c => {
+                    const [name, value] = c.trim().split('=');
+                    if (name === 'SY_ACCESS_TOKEN') tokens.SY_ACCESS_TOKEN = value;
+                    if (name === 'SY_UID') tokens.SY_UID = value;
+                    if (name === 'sy-cinfo' || name === 'SY_CINFO') tokens['sy-cinfo'] = value;
+                });
+            } catch(e) {}
+            
+            // Try localStorage
+            try {
+                if (!tokens.SY_ACCESS_TOKEN) tokens.SY_ACCESS_TOKEN = localStorage.getItem('SY_ACCESS_TOKEN');
+                if (!tokens.SY_UID) tokens.SY_UID = localStorage.getItem('SY_UID');
+                if (!tokens['sy-cinfo']) tokens['sy-cinfo'] = localStorage.getItem('sy-cinfo') || localStorage.getItem('SY_CINFO');
+            } catch(e) {}
+            
+            // Try sessionStorage
+            try {
+                if (!tokens.SY_ACCESS_TOKEN) tokens.SY_ACCESS_TOKEN = sessionStorage.getItem('SY_ACCESS_TOKEN');
+                if (!tokens.SY_UID) tokens.SY_UID = sessionStorage.getItem('SY_UID');
+                if (!tokens['sy-cinfo']) tokens['sy-cinfo'] = sessionStorage.getItem('sy-cinfo') || sessionStorage.getItem('SY_CINFO');
+            } catch(e) {}
+            
+            let html = '<h4>Extracted Tokens:</h4>';
+            
+            ['SY_ACCESS_TOKEN', 'SY_UID', 'sy-cinfo'].forEach(key => {
+                const value = tokens[key];
+                html += `<div class="token-display">
+                    <strong>${key}:</strong> 
+                    ${value ? `<span>${value.length > 50 ? value.substring(0, 50) + '...' : value}</span>
+                    <button class="copy-btn" onclick="copyToClipboard('${key}', \`${value}\`)">Copy</button>` : '<span style="color: red;">NOT FOUND</span>'}
+                </div>`;
+            });
+            
+            if (!tokens['sy-cinfo']) {
+                html += `<div class="warning">
+                    <strong>sy-cinfo not found in cookies/storage.</strong><br>
+                    You need to extract it from Network requests in DevTools (see Method 1).
+                </div>`;
+            }
+            
+            resultDiv.innerHTML = html;
+            resultDiv.classList.add('show');
+        }
+        
+        function copyToClipboard(name, value) {
+            navigator.clipboard.writeText(value).then(() => {
+                alert(`✓ ${name} copied to clipboard!`);
+            }).catch(() => {
+                prompt(`Copy ${name}:`, value);
+            });
+        }
+    </script>
+</body>
+</html>

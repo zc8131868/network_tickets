@@ -1,7 +1,8 @@
-import re
-pattern = r'[ ,\n、]'
-a = ['1', '', '2  3 4   5 ']
+from playwright.sync_api import sync_playwright
 
-new_a = [item.replace(' ', '') for item in a if item.strip()]
-
-print(new_a)
+with sync_playwright() as p:
+    browser = p.chromium.launch()
+    page = browser.new_page()
+    page.goto("https://example.com")
+    print(page.title())
+    browser.close()

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ITSR Authentication</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            text-align: center;
+        }
+        .container {
+            max-width: 500px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status.error ol {
+            text-align: left;
+            display: inline-block;
+        }
+        .status.error code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>ITSR Authentication</h2>
+        <div id="status" class="status info">
+            <div class="spinner"></div>
+            Extracting authentication tokens...
+        </div>
+    </div>
+
+    <script>
+        const callbackUrl = '{{ callback_url }}';
+
+        function getCookie(name) {
+            const value = "; " + document.cookie;
+            const parts = value.split("; " + name + "=");
+            if (parts.length === 2) return parts.pop().split(";").shift();
+            return null;
+        }
+
+        function getFromStorage(key) {
+            try {
+                return localStorage.getItem(key) || sessionStorage.getItem(key);
+            } catch(e) {
+                return null;
+            }
+        }
+
+        function updateStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = message;
+            statusDiv.className = 'status ' + type;
+        }
+
+        function extractAuthTokens() {
+            // Try multiple methods to extract tokens
+            let accessToken = null;
+            let uid = null;
+            let syCinfo = null;
+
+            // Method 1: Check cookies (only works if we're on BPM domain)
+            accessToken = getCookie('SY_ACCESS_TOKEN') || getCookie('access_token');
+            uid = getCookie('SY_UID') || getCookie('uid');
+            syCinfo = getCookie('sy-cinfo') || getCookie('SY_CINFO');
+
+            // Method 2: Check localStorage/sessionStorage
+            if (!accessToken) {
+                accessToken = getFromStorage('SY_ACCESS_TOKEN') || getFromStorage('access_token');
+            }
+            if (!uid) {
+                uid = getFromStorage('SY_UID') || getFromStorage('uid');
+            }
+            if (!syCinfo) {
+                syCinfo = getFromStorage('sy-cinfo') || getFromStorage('SY_CINFO');
+            }
+
+            // Method 3: Try to extract from current page's JavaScript variables
+            try {
+                if (window.SY_ACCESS_TOKEN) accessToken = window.SY_ACCESS_TOKEN;
+                if (window.SY_UID) uid = window.SY_UID;
+                if (window.sy_cinfo) syCinfo = window.sy_cinfo;
+            } catch(e) {}
+
+            return { accessToken, uid, syCinfo };
+        }
+
+        // Method 4: Make API request to BPM to test auth and extract from response
+        async function extractFromBPMAPI() {
+            try {
+                // Make a test API call to BPM - if user is logged in, cookies will be sent automatically
+                const response = await fetch('https://bpm.cmhktry.com/service/itsr07195287674072066508260/i-tfuwuxuqiuliebiao-user/filter-plan/itsr07195287674072066508260/shixiang/1164050706911494756', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include', // Include cookies
+                    body: JSON.stringify({
+                        "filterPlanGuids": ["1164050706911494756"],
+                        "searchParams": {
+                            "searchParam": {},
+                            "logicalOperator": "AND",
+                            "sortSettings": [],
+                            "expressionValues": {},
+                            "one2OneEntityRelationsV2": []
+                        },
+                        "pageInfo": {
+                            "pageNumber": 1,
+                            "pageSize": 1,
+                            "pages": 1,
+                            "total": 0,
+                            "needTotal": false
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    // Request succeeded - user is authenticated
+                    // Try to extract tokens from response headers or cookies
+                    // Note: We can't read Set-Cookie headers due to CORS, but we know auth works
+                    // We need to get tokens from the original BPM page
+                    return { authenticated: true };
+                }
+            } catch(e) {
+                // CORS error or other issue
+                console.log('API test failed (expected if not on BPM domain):', e);
+            }
+            return { authenticated: false };
+        }
+
+        function sendAuthToCallback(accessToken, uid, syCinfo) {
+            // Get CSRF token
+            const csrftoken = getCookie('csrftoken');
+            
+            fetch(callbackUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({
+                    access_token: accessToken,
+                    uid: uid,
+                    sy_cinfo: syCinfo || 'C4wfMXAR9mXTBKV1LQuL1w=='
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateStatus('✓ Authentication successful! Closing window...', 'success');
+                    setTimeout(() => {
+                        // Notify parent window
+                        if (window.opener) {
+                            window.opener.postMessage({type: 'itsr_auth_success'}, '*');
+                        }
+                        window.close();
+                    }, 1500);
+                } else {
+                    updateStatus('✗ Error: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                updateStatus('✗ Error sending authentication: ' + error.message, 'error');
+            });
+        }
+
+        // Try to extract tokens
+        async function attemptExtraction() {
+            // First try direct extraction
+            let { accessToken, uid, syCinfo } = extractAuthTokens();
+            
+            // If we're on BPM domain, we might be able to get cookies
+            if (window.location.href.includes('bpm.cmhktry.com')) {
+                if (accessToken && uid) {
+                    updateStatus('Tokens found! Sending to server...', 'info');
+                    sendAuthToCallback(accessToken, uid, syCinfo);
+                    return;
+                } else {
+                    // Wait a bit for cookies to be set
+                    updateStatus('Waiting for authentication tokens...', 'info');
+                    setTimeout(attemptExtraction, 2000);
+                    return;
+                }
+            }
+            
+            // If we're on our domain, we need user to provide tokens manually
+            // OR we need to redirect them to BPM first, then back
+            if (!accessToken || !uid) {
+                updateStatus(
+                    '<p>⚠️ Cannot automatically extract tokens due to browser security.</p>' +
+                    '<p><strong>Please follow these steps:</strong></p>' +
+                    '<ol style="text-align: left; display: inline-block;">' +
+                    '<li>Make sure you are logged into BPM system</li>' +
+                    '<li>Open browser Developer Tools (F12)</li>' +
+                    '<li>Go to Application/Storage tab → Cookies → bpm.cmhktry.com</li>' +
+                    '<li>Find <code>SY_ACCESS_TOKEN</code> and <code>SY_UID</code> values</li>' +
+                    '<li>Or click the button below to try automatic extraction from BPM page</li>' +
+                    '</ol>',
+                    'error'
+                );
+                
+                // Add button to redirect to BPM and try again
+                const statusDiv = document.getElementById('status');
+                const retryBtn = document.createElement('button');
+                retryBtn.textContent = 'Go to BPM and Extract Tokens';
+                retryBtn.className = 'btn';
+                retryBtn.style.marginTop = '15px';
+                retryBtn.onclick = function() {
+                    // Open BPM in same window, then redirect back
+                    window.location.href = 'https://bpm.cmhktry.com/main/portal/ctp-affair/affairPendingCenter?portletTitle=%E5%BE%85%E8%BE%A6%E4%BA%8B%E9%A0%85&callback=' + encodeURIComponent(callbackUrl);
+                };
+                statusDiv.appendChild(retryBtn);
+                return;
+            }
+            
+            // If we have tokens, send them
+            if (accessToken && uid) {
+                updateStatus('Tokens found! Sending to server...', 'info');
+                sendAuthToCallback(accessToken, uid, syCinfo);
+            }
+        }
+
+        // Start extraction when page loads
+        window.addEventListener('load', function() {
+            setTimeout(attemptExtraction, 1000);
+        });
+
+        // Also try immediately
+        attemptExtraction();
+    </script>
+</body>
+</html>

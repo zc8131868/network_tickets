@@ -31,7 +31,9 @@ from auto_tickets.views.auto_tickets_pa import auto_tickets_pa
 from auto_tickets.views.auto_vpnnet import auto_vpnnet
 from auto_tickets.views.ticket_management import ticket_management
 from auto_tickets.views.ticket_detail_search import ticket_detail_search
+from auto_tickets.views.ticket_analyzer import ticket_analyzer
 from auto_tickets.views.serve_itsr_file import serve_itsr_file
+from auto_tickets.views.itsr_auth import itsr_auth_page, itsr_auth_callback, itsr_check_auth, itsr_token_extractor, itsr_auth_sms_callback
 from auto_tickets.views.mercury_chat import mercury_chat_view, mercury_chat_api
 from auto_tickets.views.create_vendor_vpn_account import create_vendor_vpn_account
 from auto_tickets.views.download_vpn_sample import download_vpn_sample
@@ -58,7 +60,13 @@ urlpatterns = [
     path('auto_vpnnet/', auto_vpnnet, name='auto_vpnnet'),
     path('ticket_management/', ticket_management, name='ticket_management'),
     path('ticket_detail_search/', ticket_detail_search, name='ticket_detail_search'),
+    path('ticket_analyzer/', ticket_analyzer, name='ticket_analyzer'),
     path('itsr_files/<str:filename>', serve_itsr_file, name='serve_itsr_file'),
+    path('itsr_auth_page/', itsr_auth_page, name='itsr_auth_page'),
+    path('itsr_auth_callback/', itsr_auth_callback, name='itsr_auth_callback'),
+    path('itsr_auth_sms_callback/', itsr_auth_sms_callback, name='itsr_auth_sms_callback'),
+    path('itsr_check_auth/', itsr_check_auth, name='itsr_check_auth'),
+    path('itsr_token_extractor/', itsr_token_extractor, name='itsr_token_extractor'),
     path('mercury_chat/', mercury_chat_view, name='mercury_chat'),
     path('mercury_chat_api/', mercury_chat_api, name='mercury_chat_api'),
     path('create_vendor_vpn_account/', create_vendor_vpn_account, name='create_vendor_vpn_account'),

@@ -6,26 +6,104 @@ from auto_tickets.models import ITSR_Network
 import os
 from django.conf import settings
 import glob
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
 def ticket_detail_search(request):
     if request.method == 'POST':
-        # Handle status update
-        if 'update_status' in request.POST:
+        # Handle bulk close tickets in ITSR
+        if 'close_tickets_itsr' in request.POST:
+            ticket_ids = request.POST.getlist('ticket_ids')
+            handler = request.POST.get('handler', '')
+            itsr_status = request.POST.get('itsr_status', '')
+            close_itsr_mode = request.POST.get('close_itsr_mode', '') == 'true'
+            select_all = request.POST.get('select_all', '') == 'true'
+            
+            try:
+                # Update database status to 'closed' for selected tickets
+                if select_all:
+                    # When select all is checked, get all ITSR ticket numbers from displayed tickets
+                    # Filter: handler, ticket_status='complete', itsr_status='open'
+                    if close_itsr_mode and handler:
+                        query = ITSR_Network.objects.filter(
+                            handler=handler,
+                            ticket_status='complete',
+                            itsr_status='open'
+                        )
+                    else:
+                        # Fallback: get all pending tickets (for non-close_itsr_mode)
+                        query = ITSR_Network.objects.filter(
+                            ticket_status='complete',
+                            itsr_status='open'
+                        )
+                        if handler:
+                            query = query.filter(handler=handler)
+                    
+                    updated_count = query.update(itsr_status='closed')
+                    if updated_count > 0:
+                        messages.success(request, f'Successfully updated {updated_count} ticket(s) status to closed in database.')
+                    else:
+                        messages.warning(request, 'No tickets found to close.')
+                elif ticket_ids:
+                    # Update selected tickets
+                    updated_count = 0
+                    for ticket_id in ticket_ids:
+                        try:
+                            ticket = ITSR_Network.objects.get(id=ticket_id)
+                            if ticket.itsr_status != 'closed':
+                                ticket.itsr_status = 'closed'
+                                ticket.save()
+                                updated_count += 1
+                        except ITSR_Network.DoesNotExist:
+                            continue
+                    
+                    if updated_count > 0:
+                        messages.success(request, f'Successfully updated {updated_count} ticket(s) status to closed in database.')
+                    else:
+                        messages.warning(request, 'No valid tickets found to close.')
+                else:
+                    messages.warning(request, 'Please select at least one ticket to close.')
+                    
+            except Exception as e:
+                logger.error(f"Error updating ticket status: {e}")
+                messages.error(request, f'Error updating tickets: {str(e)}')
+            
+            # Redirect back to search with same parameters
+            if close_itsr_mode:
+                redirect_url = f'/ticket_detail_search/?handler={handler}&close_itsr=true'
+            else:
+                redirect_url = f'/ticket_detail_search/?handler={handler}'
+                if itsr_status:
+                    redirect_url += f'&itsr_status={itsr_status}'
+            return redirect(redirect_url)
+        
+        # Handle status update (disabled in close_itsr_mode)
+        if 'update_ticket_status' in request.POST:
+            close_itsr_mode = request.POST.get('close_itsr_mode', '') == 'true'
+            
+            # Don't allow status updates in close_itsr_mode
+            if close_itsr_mode:
+                messages.warning(request, 'Ticket status modification is not available in Close ITSR mode.')
+                handler = request.POST.get('handler', '')
+                redirect_url = f'/ticket_detail_search/?handler={handler}&close_itsr=true'
+                return redirect(redirect_url)
+            
             ticket_id = request.POST.get('ticket_id')
             new_status = request.POST.get('ticket_status')
             
             try:
                 ticket = ITSR_Network.objects.get(id=ticket_id)
-                if ticket.ticket_status == 'incomplete' and new_status == 'complete':
-                    ticket.ticket_status = 'complete'
-                    ticket.save()
-                    messages.success(request, f'Successfully updated ticket {ticket.itsr_ticket_number} status to Complete.')
-                else:
-                    messages.warning(request, 'Only incomplete tickets can be updated to complete.')
+                old_status = ticket.ticket_status
+                ticket.ticket_status = new_status
+                ticket.save()
+                messages.success(request, f'Successfully updated ticket {ticket.itsr_ticket_number} status from {old_status.title()} to {new_status.title()}.')
             except ITSR_Network.DoesNotExist:
                 messages.error(request, 'Ticket not found.')
+            except Exception as e:
+                messages.error(request, f'Error updating ticket status: {str(e)}')
             
             # Redirect back to search with same parameters
             handler = request.POST.get('handler', '')
@@ -36,7 +114,46 @@ def ticket_detail_search(request):
                 redirect_url += f'&itsr_status={itsr_status}'
             return redirect(redirect_url)
         
-        # Handle search
+        # Handle Close ITSR search
+        if 'search_action' in request.POST and request.POST.get('search_action') == 'close_itsr':
+            handler = request.POST.get('handler', '').strip()
+            
+            if not handler:
+                form = TicketDetailSearchForm(request.POST)
+                form.add_error('handler', 'Handler is required for Close ITSR function.')
+                return render(request, 'ticket_detail_search.html', {'form': form})
+            
+            # Create form with handler for display
+            form = TicketDetailSearchForm({'handler': handler})
+            
+            # Filter: handler, ticket_status='complete', itsr_status='open'
+            query = ITSR_Network.objects.filter(
+                handler=handler,
+                ticket_status='complete',
+                itsr_status='open'
+            )
+            tickets = query.order_by('-create_datetime')
+            
+            # Create tickets_with_files structure (without actual file lookup for this mode)
+            tickets_with_files = []
+            for ticket in tickets:
+                tickets_with_files.append({
+                    'ticket': ticket,
+                    'files': []  # No files needed for Close ITSR mode
+                })
+            
+            context = {
+                'form': form,
+                'tickets_with_files': tickets_with_files,
+                'search_type': 'close_itsr',
+                'handler': handler,
+                'has_results': len(tickets_with_files) > 0,
+                'close_itsr_mode': True
+            }
+            
+            return render(request, 'ticket_detail_search.html', context)
+        
+        # Handle regular search
         form = TicketDetailSearchForm(request.POST)
         if form.is_valid():
             handler = form.cleaned_data.get('handler', '').strip()
@@ -56,20 +173,14 @@ def ticket_detail_search(request):
                     tickets = []
                     search_type = 'ticket_number'
             elif handler:
-                # Search by handler
+                # Search by handler - always show incomplete tickets
+                query = ITSR_Network.objects.filter(
+                    handler=handler,
+                    ticket_status='incomplete'
+                )
+                # If ITSR Status is selected, filter by it as well
                 if itsr_status:
-                    # When ITSR Status is selected: show complete tickets with matching ITSR status
-                    query = ITSR_Network.objects.filter(
-                        handler=handler,
-                        ticket_status='complete',
-                        itsr_status=itsr_status
-                    )
-                else:
-                    # Default: show incomplete tickets
-                    query = ITSR_Network.objects.filter(
-                        handler=handler,
-                        ticket_status='incomplete'
-                    )
+                    query = query.filter(itsr_status=itsr_status)
                 tickets = query.order_by('-create_datetime')
                 search_type = 'handler'
             
@@ -113,7 +224,10 @@ def ticket_detail_search(request):
                 'search_type': search_type,
                 'handler': handler,
                 'itsr_ticket_number': itsr_ticket_number,
-                'has_results': len(tickets_with_files) > 0
+                'itsr_status': itsr_status,
+                'has_results': len(tickets_with_files) > 0,
+                'show_close_button': search_type == 'handler' and bool(itsr_status),
+                'close_itsr_mode': False
             }
             
             return render(request, 'ticket_detail_search.html', context)
@@ -125,6 +239,7 @@ def ticket_detail_search(request):
         handler = request.GET.get('handler', '').strip()
         itsr_ticket_number = request.GET.get('itsr_ticket_number', '').strip()
         itsr_status = request.GET.get('itsr_status', '').strip()
+        close_itsr = request.GET.get('close_itsr', '').strip() == 'true'
         
         form = TicketDetailSearchForm(initial={
             'handler': handler,
@@ -132,7 +247,34 @@ def ticket_detail_search(request):
             'itsr_status': itsr_status
         })
         
-        # If parameters provided, perform search
+        # Handle Close ITSR mode
+        if close_itsr and handler:
+            query = ITSR_Network.objects.filter(
+                handler=handler,
+                ticket_status='complete',
+                itsr_status='open'
+            )
+            tickets = query.order_by('-create_datetime')
+            
+            tickets_with_files = []
+            for ticket in tickets:
+                tickets_with_files.append({
+                    'ticket': ticket,
+                    'files': []
+                })
+            
+            context = {
+                'form': form,
+                'tickets_with_files': tickets_with_files,
+                'search_type': 'close_itsr',
+                'handler': handler,
+                'has_results': len(tickets_with_files) > 0,
+                'close_itsr_mode': True
+            }
+            
+            return render(request, 'ticket_detail_search.html', context)
+        
+        # If parameters provided, perform regular search
         if handler or itsr_ticket_number:
             tickets = []
             search_type = None
@@ -146,20 +288,14 @@ def ticket_detail_search(request):
                     tickets = []
                     search_type = 'ticket_number'
             elif handler:
-                # Search by handler
+                # Search by handler - always show incomplete tickets
+                query = ITSR_Network.objects.filter(
+                    handler=handler,
+                    ticket_status='incomplete'
+                )
+                # If ITSR Status is selected, filter by it as well
                 if itsr_status:
-                    # When ITSR Status is selected: show complete tickets with matching ITSR status
-                    query = ITSR_Network.objects.filter(
-                        handler=handler,
-                        ticket_status='complete',
-                        itsr_status=itsr_status
-                    )
-                else:
-                    # Default: show incomplete tickets
-                    query = ITSR_Network.objects.filter(
-                        handler=handler,
-                        ticket_status='incomplete'
-                    )
+                    query = query.filter(itsr_status=itsr_status)
                 tickets = query.order_by('-create_datetime')
                 search_type = 'handler'
             
@@ -202,7 +338,9 @@ def ticket_detail_search(request):
                 'handler': handler,
                 'itsr_ticket_number': itsr_ticket_number,
                 'itsr_status': itsr_status,
-                'has_results': len(tickets_with_files) > 0
+                'has_results': len(tickets_with_files) > 0,
+                'show_close_button': search_type == 'handler' and bool(itsr_status),
+                'close_itsr_mode': False
             }
             
             return render(request, 'ticket_detail_search.html', context)

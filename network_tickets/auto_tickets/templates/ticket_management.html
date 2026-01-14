@@ -309,6 +309,22 @@
                 
                 <div class="row form-row">
                     <div class="col-12">
+                        <label for="{{ form.description.id_for_label }}" class="form-label">
+                            <i class="fas fa-align-left me-2"></i>{{ form.description.label }}
+                        </label>
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.description.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row form-row">
+                    <div class="col-12">
                         <label for="{{ form.file.id_for_label }}" class="form-label">
                             <i class="fas fa-file-upload me-2"></i>{{ form.file.label }}
                         </label>

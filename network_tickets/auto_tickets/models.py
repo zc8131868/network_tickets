@@ -101,6 +101,7 @@ class ITSR_Network(models.Model):
     ticket_status = models.CharField(max_length=100, choices=TICKET_STATUS_CHOICES, verbose_name='ticket status')
     itsr_status = models.CharField(max_length=100, choices=ITSR_STATUS_CHOICES, verbose_name='itsr status')
     create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
-    
+    description = models.CharField(max_length=500, unique=False, blank=True, verbose_name='description')
+
     def __str__(self):
         return f"{self.__class__.__name__}(itsr_ticket_number: {self.itsr_ticket_number} | requestor: {self.requestor} | handler: {self.handler} | ticket_status: {self.ticket_status} | itsr_status: {self.itsr_status})"

@@ -1,0 +1,455 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    <style type="text/css">
+    label.required::before {
+        content: "*";
+        color: red;
+        font-weight: bold;
+        margin-right: 4px;
+    }
+    
+    .analyzer-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+    
+    .form-card {
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        border: none;
+    }
+    
+    .form-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 1.5rem 2rem;
+        margin: -2.5rem -2.5rem 2rem -2.5rem;
+        border-radius: 1.5rem 1.5rem 0 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+    }
+    
+    .form-field-frame {
+        background: #f9fafb;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-field-frame:hover {
+        border-color: #667eea;
+        background: #faf5ff;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+    
+    .btn-submit {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 2.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 0.75rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        color: white;
+    }
+    
+    .results-section {
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .results-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .tickets-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+    
+    .tickets-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .tickets-table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    
+    .tickets-table td {
+        padding: 0.875rem 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 0.9rem;
+    }
+    
+    .tickets-table tbody tr:hover {
+        background-color: #f9fafb;
+    }
+    
+    .tickets-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    
+    .status-complete {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-incomplete {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-open {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .status-closed {
+        background: #e5e7eb;
+        color: #374151;
+    }
+    
+    .chart-container {
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .chart-wrapper {
+        position: relative;
+        height: 400px;
+        margin-top: 1.5rem;
+    }
+    
+    .no-results {
+        text-align: center;
+        padding: 3rem;
+        color: #6b7280;
+    }
+    
+    .no-results i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        color: #d1d5db;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 4rem 0;
+        margin-bottom: 3rem;
+        border-radius: 0 0 3rem 3rem;
+        text-align: center;
+    }
+    
+    .page-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .page-header .lead {
+        font-size: 1.2rem;
+        opacity: 0.9;
+    }
+    </style>
+{% endblock head %}
+
+{% block body %}
+    <div class="analyzer-container">
+        <div class="page-header">
+            <h1><i class="fas fa-chart-line me-2"></i>Ticket Analyzer</h1>
+            <p class="lead">Analyze tickets anywhere, anytime -filtered by any status</p>
+        </div>
+        
+        <div class="form-card">
+            <div class="card-header">
+                <i class="fas fa-filter me-2"></i>Filter Options
+            </div>
+            
+            <form method="get" id="analyzer-form">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-field-frame">
+                            <label for="{{ form.date_from.id_for_label }}" class="form-label">
+                                <i class="fas fa-calendar-alt me-2"></i>{{ form.date_from.label }}
+                            </label>
+                            {{ form.date_from }}
+                            {% if form.date_from.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.date_from.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-field-frame">
+                            <label for="{{ form.date_to.id_for_label }}" class="form-label">
+                                <i class="fas fa-calendar-check me-2"></i>{{ form.date_to.label }}
+                            </label>
+                            {{ form.date_to }}
+                            {% if form.date_to.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.date_to.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-field-frame">
+                            <label for="{{ form.handler.id_for_label }}" class="form-label">
+                                <i class="fas fa-user-tie me-2"></i>{{ form.handler.label }}
+                            </label>
+                            {{ form.handler }}
+                            {% if form.handler.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.handler.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-field-frame">
+                            <label for="{{ form.ticket_status.id_for_label }}" class="form-label">
+                                <i class="fas fa-tasks me-2"></i>{{ form.ticket_status.label }}
+                            </label>
+                            {{ form.ticket_status }}
+                            {% if form.ticket_status.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.ticket_status.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <button class="btn btn-submit" type="submit">
+                        <i class="fas fa-search me-2"></i>Analyze
+                    </button>
+                    <button class="btn btn-secondary ms-2" type="button" onclick="resetForm()">
+                        <i class="fas fa-redo me-2"></i>Reset
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        {% if has_results %}
+            <div class="chart-container">
+                <div class="results-header">
+                    <h3><i class="fas fa-chart-pie me-2"></i>Ticket Status Distribution</h3>
+                    <div style="display: flex; gap: 1.5rem; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; width: 20px; height: 20px; background: #10b981; border-radius: 4px;"></span>
+                            <strong>Complete: {{ complete_count }}</strong>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; width: 20px; height: 20px; background: #f59e0b; border-radius: 4px;"></span>
+                            <strong>Incomplete: {{ incomplete_count }}</strong>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="display: inline-block; width: 20px; height: 20px; background: #667eea; border-radius: 4px;"></span>
+                            <strong>Total: {{ total_count }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <div class="results-header">
+                    <h3><i class="fas fa-list me-2"></i>Tickets ({{ total_count }})</h3>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="tickets-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket Number</th>
+                                <th>Handler</th>
+                                <th>Ticket Status</th>
+                                <th>ITSR Status</th>
+                                <th>Created Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ticket in tickets %}
+                                <tr>
+                                    <td><strong>{{ ticket.itsr_ticket_number }}</strong></td>
+                                    <td>{{ ticket.handler }}</td>
+                                    <td>
+                                        <span class="status-badge status-{{ ticket.ticket_status }}">
+                                            {{ ticket.get_ticket_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ ticket.itsr_status }}">
+                                            {{ ticket.get_itsr_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ ticket.create_datetime|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if tickets.has_other_pages %}
+                    <div class="pagination-wrapper" style="margin-top: 2rem; display: flex; justify-content: center; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                        {% if tickets.has_previous %}
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ tickets.previous_page_number }}" 
+                               class="btn btn-outline-primary" style="padding: 0.5rem 1rem;">
+                                <i class="fas fa-chevron-left me-1"></i>Previous
+                            </a>
+                        {% else %}
+                            <span class="btn btn-outline-secondary" style="padding: 0.5rem 1rem; opacity: 0.5; cursor: not-allowed;">
+                                <i class="fas fa-chevron-left me-1"></i>Previous
+                            </span>
+                        {% endif %}
+                        
+                        <span style="font-weight: 600; color: #374151;">
+                            Page {{ tickets.number }} of {{ tickets.paginator.num_pages }}
+                            <span style="color: #6b7280; font-weight: normal; margin-left: 0.5rem;">
+                                (Showing {{ tickets.start_index }}-{{ tickets.end_index }} of {{ total_count }} tickets)
+                            </span>
+                        </span>
+                        
+                        {% if tickets.has_next %}
+                            <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ tickets.next_page_number }}" 
+                               class="btn btn-outline-primary" style="padding: 0.5rem 1rem;">
+                                Next<i class="fas fa-chevron-right ms-1"></i>
+                            </a>
+                        {% else %}
+                            <span class="btn btn-outline-secondary" style="padding: 0.5rem 1rem; opacity: 0.5; cursor: not-allowed;">
+                                Next<i class="fas fa-chevron-right ms-1"></i>
+                            </span>
+                        {% endif %}
+                    </div>
+                {% elif total_count > 0 %}
+                    <div class="pagination-wrapper" style="margin-top: 2rem; display: flex; justify-content: center; align-items: center;">
+                        <span style="font-weight: 600; color: #374151;">
+                            Showing all {{ total_count }} ticket{{ total_count|pluralize }}
+                        </span>
+                    </div>
+                {% endif %}
+            </div>
+        {% elif request.GET %}
+            <div class="results-section">
+                <div class="no-results">
+                    <i class="fas fa-search"></i>
+                    <h4>No tickets found</h4>
+                    <p>Please try different filter criteria.</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        function resetForm() {
+            document.getElementById('analyzer-form').reset();
+            window.location.href = '{% url "ticket_analyzer" %}';
+        }
+        
+        // Initialize pie chart
+        {% if has_results %}
+        const chartData = {{ chart_data|safe }};
+        
+        // Create labels with counts: "Complete: 3", "Incomplete: 7"
+        const labelsWithCounts = chartData.labels.map((label, index) => {
+            return `${label}: ${chartData.data[index]}`;
+        });
+        
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        const pieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labelsWithCounts,
+                datasets: [{
+                    data: chartData.data,
+                    backgroundColor: chartData.colors,
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 20,
+                            font: {
+                                size: 14,
+                                weight: '600'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                // Extract the base label (e.g., "Complete" from "Complete: 3")
+                                const baseLabel = label.split(':')[0];
+                                return `${baseLabel}: ${value} tickets (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    </script>
+{% endblock body %}

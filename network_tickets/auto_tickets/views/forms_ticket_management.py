@@ -64,6 +64,16 @@ class TicketManagementForm(forms.Form):
         })
     )
 
+    description = forms.CharField(
+        label='Description',
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter ticket description (optional)',
+            'rows': 3
+        })
+    )
+
     file = forms.FileField(
         label='Upload File',
         required=False,

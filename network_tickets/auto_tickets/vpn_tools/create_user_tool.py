@@ -1,6 +1,8 @@
 import requests
 import openpyxl
 import re
+from datetime import datetime
+from datetime import timedelta
 
 # Phone number validation patterns
 # Supports: 11-digit mainland China numbers, +852/HK 8-digit, +86/86 11-digit
@@ -73,6 +75,9 @@ def get_manager_id(manager_email):
         return None
 #################################################### create user ########################################################################################
 def call_create_user_api(vendor_name, vendor_email, phone_number, manager_email):
+    
+    now = datetime.now()
+    formatted_date_after1year = (now + timedelta(days=365)).strftime("%Y-%m-%d")
     manager_id = get_manager_id(manager_email)
     
     if manager_id is None:
@@ -90,7 +95,7 @@ def call_create_user_api(vendor_name, vendor_email, phone_number, manager_email)
         'manager_ids': [manager_id],
         'department_id': department_id,
         'invite_type': 3,
-
+        'expired_at': formatted_date_after1year,
     }
     try:
         response = requests.post(url, json=payload, headers=header)

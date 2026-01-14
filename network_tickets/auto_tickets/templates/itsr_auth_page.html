@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ITSR Authentication</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .header {
+            background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            margin: -40px -40px 30px -40px;
+        }
+        .instructions {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        .instructions li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #1976d2;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 10px 5px;
+            cursor: pointer;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background: #1565c0;
+        }
+        .btn-secondary {
+            background: #757575;
+        }
+        .btn-secondary:hover {
+            background: #616161;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .status.show {
+            display: block;
+        }
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        .bookmarklet-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: none;
+        }
+        .bookmarklet-section.show {
+            display: block;
+        }
+        .bookmarklet-link {
+            display: inline-block;
+            padding: 15px 25px;
+            background: #4caf50;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 15px 0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .bookmarklet-link:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2 style="margin: 0;">🔐 ITSR Authentication Required</h2>
+        </div>
+        
+        <div id="initialState">
+            <p style="font-size: 16px; margin: 20px 0;">To close tickets in ITSR, you need to authenticate with the BPM system.</p>
+            
+            <div class="instructions">
+                <p style="margin: 0 0 10px 0; font-weight: 600;"><strong>Step-by-Step Instructions:</strong></p>
+                <ol>
+                    <li><strong>Open BPM</strong> - Click the button below or use the direct link</li>
+                    <li><strong>Log in to BPM</strong> - Complete login in the BPM window/tab</li>
+                    <li><strong>Extract tokens</strong> - Follow Method 2 below (open DevTools and copy tokens)</li>
+                    <li><strong>Paste tokens here</strong> - Paste them in the form below and click Submit</li>
+                    <li><strong>Done!</strong> - This window will close and you can close tickets</li>
+                </ol>
+            </div>
+            
+            <button onclick="openBPMLogin()" class="btn" id="openBpmBtn">Open BPM Login Window</button>
+            <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                <strong>Or use direct link:</strong> 
+                <a href="{{ bpm_url }}" target="_blank" style="color: #1976d2; text-decoration: underline; font-weight: 600;">Open BPM in New Tab →</a>
+            </p>
+            
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 6px; margin-top: 20px; border-left: 4px solid #4caf50;">
+                <p style="margin: 0 0 10px 0; font-weight: 600; color: #2e7d32;">✓ Already opened BPM? Continue below ↓</p>
+            </div>
+            
+            <!-- Token extraction form - always visible -->
+            <div style="background: #fce4ec; padding: 20px; border-radius: 6px; margin-top: 30px; border: 2px solid #c2185b;">
+                <h3 style="margin-top: 0; color: #c2185b;">📌 Step 2: Extract & Submit Your Tokens</h3>
+                <div style="background: #fff3cd; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                    <p style="margin: 0; font-weight: 600; color: #856404;">⚠️ IMPORTANT: You must extract ALL THREE values to avoid 466 errors!</p>
+                </div>
+                <p style="font-size: 14px; margin: 10px 0; font-weight: 600; color: #c2185b;">After logging into BPM, follow these steps:</p>
+                <ol style="text-align: left; display: inline-block; margin: 15px 0; padding-left: 25px; font-size: 14px; line-height: 1.8;">
+                    <li>In your BPM tab/window, press <kbd style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-weight: bold;">F12</kbd> to open Developer Tools</li>
+                    <li>Click the <strong>"Application"</strong> tab at the top (or <strong>"Storage"</strong> in Firefox)</li>
+                    <li>In the left sidebar, expand <strong>"Cookies"</strong></li>
+                    <li>Click on <strong>"https://bpm.cmhktry.com"</strong></li>
+                    <li><strong>REQUIRED:</strong> Find <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">SY_ACCESS_TOKEN</code> and copy its <strong>Value</strong></li>
+                    <li><strong>REQUIRED:</strong> Find <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">SY_UID</code> and copy its <strong>Value</strong></li>
+                    <li><strong>REQUIRED:</strong> Find <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">sy-cinfo</code> - <span style="color: #dc3545; font-weight: bold;">BEST METHOD: Extract from Network Requests!</span>
+                        <ol style="margin-top: 5px; padding-left: 25px; font-size: 13px;">
+                            <li><strong>Method 1 (RECOMMENDED):</strong> In DevTools, go to <strong>"Network"</strong> tab</li>
+                            <li>Make a request in BPM (refresh page, click something, or navigate)</li>
+                            <li>Find any request to <code>bpm.cmhktry.com</code> (filter by "bpm")</li>
+                            <li>Click on the request → Go to <strong>"Headers"</strong> tab</li>
+                            <li>Look in <strong>"Request Headers"</strong> for <code>sy-cinfo:</code> and copy its value</li>
+                            <li><strong>OR</strong> look in <strong>"Request Cookies"</strong> for <code>sy-cinfo</code> cookie value</li>
+                            <li style="margin-top: 10px;"><strong>Method 2 (Fallback):</strong> Check Cookies → <code>https://bpm.cmhktry.com</code> → Find <code>sy-cinfo</code></li>
+                            <li><strong>Method 3 (Last resort):</strong> Check Local Storage or Session Storage → <code>https://bpm.cmhktry.com</code></li>
+                        </ol>
+                        <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; border-left: 4px solid #ffc107;">
+                            <strong>⚠️ IMPORTANT:</strong> sy-cinfo is session-specific and may change. Extract it from an <strong>active network request</strong> while you're using BPM for the most reliable value.
+                        </div>
+                    </li>
+                    <li>Paste all three values in the form below and click Submit</li>
+                </ol>
+                <div style="background: #fff; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #c2185b;">
+                    <p style="margin: 0 0 10px 0; font-weight: 600; color: #c2185b;">📋 Paste Your Tokens Here:</p>
+                    <label style="display: block; margin: 10px 0 5px 0; font-weight: 600; font-size: 13px;">SY_ACCESS_TOKEN:</label>
+                    <input type="text" id="manualAccessTokenInitial" placeholder="Paste the long SY_ACCESS_TOKEN value here..." style="width: 100%; padding: 10px; margin: 5px 0; border: 2px solid #c2185b; border-radius: 4px; font-family: monospace; font-size: 12px; box-sizing: border-box;">
+                    <label style="display: block; margin: 10px 0 5px 0; font-weight: 600; font-size: 13px;">SY_UID:</label>
+                    <input type="text" id="manualUidInitial" placeholder="Paste SY_UID value here (e.g., 1239585158293766388)" style="width: 100%; padding: 10px; margin: 5px 0; border: 2px solid #c2185b; border-radius: 4px; font-family: monospace; font-size: 12px; box-sizing: border-box;">
+                    <label style="display: block; margin: 10px 0 5px 0; font-weight: 600; font-size: 13px;">sy-cinfo (Optional - but recommended to avoid 466 errors):</label>
+                    <input type="text" id="manualSyCinfoInitial" placeholder="Paste sy-cinfo value here (optional, e.g., EYNrn5U18eaFmRxYr2gyXg==)" style="width: 100%; padding: 10px; margin: 5px 0; border: 2px solid #c2185b; border-radius: 4px; font-family: monospace; font-size: 12px; box-sizing: border-box;">
+                    <p style="font-size: 11px; color: #666; margin: 5px 0 0 0;">
+                        💡 <strong>Optional but recommended:</strong> If you get 466 errors, extract sy-cinfo from Network tab → Request Headers. 
+                        If left empty, system will try with default value (may cause 466 errors).
+                    </p>
+                    <button id="submitTokensBtnInitial" type="button" class="btn" onclick="
+                        console.log('=== SUBMIT BUTTON CLICKED (inline) ===');
+                        const tokenInput = document.getElementById('manualAccessTokenInitial');
+                        const uidInput = document.getElementById('manualUidInitial');
+                        const syCinfoInput = document.getElementById('manualSyCinfoInitial');
+                        
+                        if (!tokenInput || !uidInput) {
+                            alert('Error: Form fields not found!');
+                            return false;
+                        }
+                        
+                        const token = tokenInput.value.trim();
+                        const uid = uidInput.value.trim();
+                        const syCinfo = syCinfoInput ? syCinfoInput.value.trim() : '';
+                        
+                        console.log('Token length:', token.length);
+                        console.log('UID:', uid);
+                        console.log('sy-cinfo:', syCinfo || 'MISSING (will use default)');
+                        
+                        if (!token || !uid) {
+                            alert('Please enter both SY_ACCESS_TOKEN and SY_UID');
+                            return false;
+                        }
+                        
+                        // sy-cinfo is optional - warn if missing but allow submission
+                        if (!syCinfo) {
+                            const proceed = confirm(
+                                '⚠️ sy-cinfo is empty.\n\n' +
+                                'You can proceed without it, but you may get 466 errors.\n\n' +
+                                'For best results, extract sy-cinfo from:\n' +
+                                'Network tab → Request Headers → sy-cinfo\n\n' +
+                                'Click OK to proceed without sy-cinfo, or Cancel to add it.'
+                            );
+                            if (!proceed) {
+                                return false;
+                            }
+                        }
+                        
+                        const btn = document.getElementById('submitTokensBtnInitial');
+                        if (btn) {
+                            btn.disabled = true;
+                            btn.textContent = '⏳ Submitting...';
+                        }
+                        
+                        const callbackUrl = '{{ callback_url }}';
+                        console.log('Submitting to:', callbackUrl);
+                        
+                        function getCookie(name) {
+                            const value = '; ' + document.cookie;
+                            const parts = value.split('; ' + name + '=');
+                            if (parts.length === 2) return parts.pop().split(';').shift();
+                            return null;
+                        }
+                        
+                        fetch(callbackUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCookie('csrftoken') || ''
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({
+                                access_token: token,
+                                uid: uid,
+                                sy_cinfo: syCinfo || 'C4wfMXAR9mXTBKV1LQuL1w=='
+                            })
+                        })
+                        .then(response => {
+                            console.log('Response status:', response.status);
+                            if (!response.ok) {
+                                return response.text().then(text => {
+                                    throw new Error('HTTP ' + response.status + ': ' + text.substring(0, 200));
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Response data:', data);
+                            if (data.success) {
+                                alert('✓ Authentication successful! Closing window...');
+                                if (window.opener) {
+                                    window.opener.postMessage({type: 'itsr_auth_success'}, '*');
+                                }
+                                setTimeout(() => window.close(), 1500);
+                            } else {
+                                alert('Error: ' + (data.message || 'Unknown error'));
+                                if (btn) {
+                                    btn.disabled = false;
+                                    btn.textContent = '✅ Submit Tokens & Complete Authentication';
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Fetch error:', error);
+                            alert('Error: ' + error.message);
+                            if (btn) {
+                                btn.disabled = false;
+                                btn.textContent = '✅ Submit Tokens & Complete Authentication';
+                            }
+                        });
+                        
+                        return false;
+                    " style="width: 100%; margin-top: 15px; background: #c2185b; font-size: 18px; padding: 15px; cursor: pointer; color: white; border: none; border-radius: 6px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: block !important; visibility: visible !important;">
+                        ✅ Submit Tokens & Complete Authentication
+                    </button>
+                    <p style="margin-top: 10px; font-size: 12px; color: #666; text-align: center;">If you don't see the button above, check browser console (F12)</p>
+                    <button onclick="alert('JavaScript is working!'); console.log('Test button clicked');" style="width: 100%; margin-top: 10px; padding: 8px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">🧪 Test: Click to verify JavaScript works</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="afterLoginState" style="display: none;">
+            <div class="status info show" id="statusMessage">
+                <p style="margin: 0;"><strong>✓ BPM window opened!</strong></p>
+                <p style="margin: 10px 0 0 0;">Please complete login in the BPM window, then follow the steps below.</p>
+            </div>
+            
+            <div class="bookmarklet-section show" id="bookmarkletSection">
+                <h3 style="margin-top: 0;">📌 Step 2: Extract Authentication Tokens</h3>
+                <p style="font-size: 14px; margin: 15px 0;"><strong>After you log in to BPM, you need to extract your authentication tokens:</strong></p>
+                <div style="background: #fff3cd; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                    <p style="margin: 0 0 10px 0; font-weight: 600; color: #856404;">⚠️ Important Steps:</p>
+                    <ol style="text-align: left; display: inline-block; margin: 10px 0; padding-left: 25px; color: #856404;">
+                        <li><strong>Go to the BPM login window</strong> (the one that just opened)</li>
+                        <li><strong>Make sure you're logged in</strong> (you should see the BPM dashboard)</li>
+                        <li><strong>Try Method 1 first</strong> (bookmarklet below)</li>
+                        <li><strong>If that fails</strong>, use Method 2 (manual extraction via DevTools)</li>
+                    </ol>
+                </div>
+                
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 15px 0;">
+                    <h4 style="margin-top: 0; color: #1976d2;">Method 1: Bookmarklet (Try This First)</h4>
+                    <ol style="text-align: left; display: inline-block; margin: 10px 0; padding-left: 25px;">
+                        <li>Drag the green button below to your bookmarks bar</li>
+                        <li>While on the BPM page, click the bookmarklet</li>
+                        <li>If it shows "Tokens not found", use Method 2</li>
+                    </ol>
+                    <a href="" id="bookmarkletLink" class="bookmarklet-link" onclick="alert('⚠️ Don\'t click here!\\n\\nDrag this link to your bookmarks bar, then click it while on the BPM page.'); return false;">📌 Extract ITSR Auth (Drag to Bookmarks Bar)</a>
+                </div>
+                
+                <div style="background: #fce4ec; padding: 20px; border-radius: 6px; margin: 15px 0; border: 2px solid #c2185b;">
+                    <h4 style="margin-top: 0; color: #c2185b; font-size: 18px;">⭐ Method 2: Manual Extraction (Recommended - Most Reliable)</h4>
+                    <p style="font-size: 14px; margin: 10px 0; font-weight: 600; color: #c2185b;">Follow these steps in your BPM window/tab:</p>
+                    <ol style="text-align: left; display: inline-block; margin: 15px 0; padding-left: 25px; font-size: 14px; line-height: 1.8;">
+                        <li>Make sure you're <strong>logged into BPM</strong> (you should see the BPM dashboard)</li>
+                        <li>Press <kbd style="background: #f0f0f0; padding: 4px 8px; border-radius: 4px; font-weight: bold;">F12</kbd> to open Developer Tools</li>
+                        <li>Click the <strong>"Application"</strong> tab at the top (or <strong>"Storage"</strong> in Firefox)</li>
+                        <li>In the left sidebar, expand <strong>"Cookies"</strong></li>
+                        <li>Click on <strong>"https://bpm.cmhktry.com"</strong></li>
+                        <li>Find the row with name <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">SY_ACCESS_TOKEN</code></li>
+                        <li>Copy the <strong>Value</strong> column (it's a long string)</li>
+                        <li>Also find <code style="background: #fff; padding: 2px 6px; border-radius: 3px;">SY_UID</code> and copy its value</li>
+                        <li>Paste both values in the form below and click Submit</li>
+                    </ol>
+                    <div style="background: #fff; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #c2185b;">
+                        <p style="margin: 0 0 10px 0; font-weight: 600; color: #c2185b;">📋 Paste Your Tokens Here:</p>
+                        <label style="display: block; margin: 10px 0 5px 0; font-weight: 600; font-size: 13px;">SY_ACCESS_TOKEN:</label>
+                        <input type="text" id="manualAccessToken" placeholder="Paste the long SY_ACCESS_TOKEN value here..." style="width: 100%; padding: 10px; margin: 5px 0; border: 2px solid #c2185b; border-radius: 4px; font-family: monospace; font-size: 12px; box-sizing: border-box;">
+                        <label style="display: block; margin: 10px 0 5px 0; font-weight: 600; font-size: 13px;">SY_UID:</label>
+                        <input type="text" id="manualUid" placeholder="Paste SY_UID here (e.g., 1239585158293766388)" style="width: 100%; padding: 10px; margin: 5px 0; border: 2px solid #c2185b; border-radius: 4px; font-family: monospace; font-size: 12px; box-sizing: border-box;">
+                        <button id="submitTokensBtn" class="btn" style="width: 100%; margin-top: 15px; background: #c2185b; font-size: 16px; padding: 12px;">✅ Submit Tokens & Complete Authentication</button>
+                    </div>
+                </div>
+                
+                <p style="font-size: 12px; color: #666; margin-top: 15px;">
+                    <strong>Tip:</strong> If you can't see your bookmarks bar, press <kbd style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">Ctrl+Shift+B</kbd> (Windows) or <kbd style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">Cmd+Shift+B</kbd> (Mac) to show it.
+                </p>
+                <button onclick="checkIfLoggedIn()" class="btn btn-secondary" style="margin-top: 10px;">Check if Already Authenticated</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Immediate test - should show in console immediately
+        console.log('ITSR Auth Page: Script loaded');
+        
+        const callbackUrl = '{{ callback_url }}';
+        const bpmUrl = '{{ bpm_url }}';
+        let loginWindow = null;
+        
+        console.log('Callback URL:', callbackUrl);
+        console.log('BPM URL:', bpmUrl);
+        
+        // Define functions FIRST so they're available when event listeners are set up
+        function submitManualTokensFromInitial(e) {
+            console.log('=== submitManualTokensFromInitial called ===');
+            
+            // Prevent default form submission if called from event
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            const accessTokenInput = document.getElementById('manualAccessTokenInitial');
+            const uidInput = document.getElementById('manualUidInitial');
+            
+            console.log('Access Token Input:', accessTokenInput);
+            console.log('UID Input:', uidInput);
+            
+            if (!accessTokenInput || !uidInput) {
+                alert('Error: Form fields not found. Please refresh the page.');
+                console.error('Form fields not found');
+                return false;
+            }
+            
+            const accessToken = accessTokenInput.value.trim();
+            const uid = uidInput.value.trim();
+            
+            console.log('Access Token length:', accessToken.length);
+            console.log('UID:', uid);
+            
+            if (!accessToken || !uid) {
+                alert('Please enter both SY_ACCESS_TOKEN and SY_UID');
+                return false;
+            }
+            
+            // Disable button to prevent double submission
+            const submitBtn = document.getElementById('submitTokensBtnInitial');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Submitting...';
+            }
+            
+            submitTokensToServer(accessToken, uid, submitBtn);
+            return false;
+        }
+        
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('ITSR Auth Page: DOM loaded');
+            
+            // Attach event listeners to buttons
+            const submitBtnInitial = document.getElementById('submitTokensBtnInitial');
+            const submitBtn = document.getElementById('submitTokensBtn');
+            
+            if (submitBtnInitial) {
+                console.log('Found submitTokensBtnInitial button');
+                submitBtnInitial.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Submit button (initial) clicked via event listener!');
+                    submitManualTokensFromInitial(e);
+                    return false;
+                });
+                // Also keep onclick as fallback
+                submitBtnInitial.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Submit button (initial) clicked via onclick!');
+                    submitManualTokensFromInitial(e);
+                    return false;
+                };
+            } else {
+                console.error('submitTokensBtnInitial button not found!');
+            }
+            
+            if (submitBtn) {
+                console.log('Found submitTokensBtn button');
+                submitBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Submit button clicked!');
+                    submitManualTokens();
+                });
+            }
+        });
+
+        // Generate bookmarklet code with better error handling and multiple token sources
+        const bookmarkletCode = `javascript:(function(){try{const host=window.location.hostname;if(!host.includes('bpm.cmhktry.com')){alert('⚠️ Please run this bookmarklet on the BPM page (bpm.cmhktry.com)\\n\\nCurrent page: '+host);return;}let t=null,u=null,c='C4wfMXAR9mXTBKV1LQuL1w==';const cookies=document.cookie;const getCookie=(name)=>{const match=cookies.match(new RegExp('(^|; )'+name.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')+'=([^;]*)'));return match?decodeURIComponent(match[2]):null;};const getStorage=(key)=>{try{return localStorage.getItem(key)||sessionStorage.getItem(key);}catch(e){return null;}};t=getCookie('SY_ACCESS_TOKEN')||getCookie('access_token')||getCookie('ACCESS_TOKEN')||getStorage('SY_ACCESS_TOKEN')||getStorage('access_token')||(window.SY_ACCESS_TOKEN)||(window.access_token);u=getCookie('SY_UID')||getCookie('uid')||getCookie('UID')||getStorage('SY_UID')||getStorage('uid')||(window.SY_UID)||(window.uid);c=getCookie('sy-cinfo')||getCookie('SY_CINFO')||getStorage('sy-cinfo')||getStorage('SY_CINFO')||(window.sy_cinfo)||(window.SY_CINFO)||'C4wfMXAR9mXTBKV1LQuL1w==';if(!t||!u){const cookieList=cookies.split(';').map(s=>s.trim()).slice(0,5).join('\\n');const storageKeys=[];try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.toLowerCase().includes('token')||key.toLowerCase().includes('uid')||key.toLowerCase().includes('auth')){storageKeys.push(key+'='+localStorage.getItem(key).substring(0,30));}}for(let i=0;i<sessionStorage.length;i++){const key=sessionStorage.key(i);if(key.toLowerCase().includes('token')||key.toLowerCase().includes('uid')||key.toLowerCase().includes('auth')){storageKeys.push(key+'='+sessionStorage.getItem(key).substring(0,30));}}}catch(e){}alert('✗ SY_ACCESS_TOKEN not found!\\n\\nFound:\\n- SY_UID: '+(u||'NOT FOUND')+'\\n\\nCookies found:\\n'+cookieList+(storageKeys.length>0?'\\n\\nStorage keys:\\n'+storageKeys.slice(0,3).join('\\n'):'')+'\\n\\nPossible reasons:\\n1. Cookie is HttpOnly (not accessible)\\n2. Need to navigate to a different BPM page\\n3. Token stored in a different location\\n\\nTry:\\n1. Navigate to a BPM page that makes API calls\\n2. Open DevTools (F12) → Application → Cookies → bpm.cmhktry.com\\n3. Check if SY_ACCESS_TOKEN exists there');return;}fetch('${callbackUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:t,uid:u,sy_cinfo:c})}).then(r=>{if(!r.ok){throw new Error('HTTP '+r.status);}return r.json();}).then(d=>{if(d.success){alert('✓ Authentication sent successfully!\\n\\nYou can close this BPM window now.');if(window.opener){window.opener.postMessage({type:'itsr_auth_success'},'*');}setTimeout(()=>{if(window.opener)window.close();},2000);}else{alert('✗ Error: '+d.message);}}).catch(e=>{alert('✗ Error sending authentication:\\n'+e.message+'\\n\\nPlease check your network connection.');});}catch(err){alert('✗ Bookmarklet error: '+err.message);}})();`;
+        
+        // Set bookmarklet link
+        document.getElementById('bookmarkletLink').href = bookmarkletCode;
+
+        function openBPMLogin() {
+            try {
+                // Check if popup was previously blocked
+                const button = event.target;
+                button.disabled = true;
+                button.textContent = 'Opening...';
+                
+                // Open BPM login in a new window (not iframe, so user can actually see and use login form)
+                loginWindow = window.open(
+                    bpmUrl,
+                    'bpm_login',
+                    'width=1200,height=800,scrollbars=yes,resizable=yes,location=yes,toolbar=yes'
+                );
+                
+                // Check if popup was blocked
+                setTimeout(() => {
+                    if (!loginWindow || loginWindow.closed || typeof loginWindow.closed === 'undefined') {
+                        // Popup was blocked
+                        button.disabled = false;
+                        button.textContent = 'Open BPM Login Window';
+                        alert('⚠️ Popup blocked!\n\nPlease:\n1. Allow popups for this site\n2. Check your browser\'s popup blocker settings\n3. Try clicking the button again\n\nOr manually open: ' + bpmUrl);
+                        return;
+                    }
+                    
+                    // Popup opened successfully
+                    button.textContent = '✓ Window Opened';
+                    button.style.background = '#4caf50';
+                    
+                    // Show instructions
+                    document.getElementById('initialState').style.display = 'none';
+                    document.getElementById('afterLoginState').style.display = 'block';
+                    
+                    // Monitor if login window is closed
+                    const checkClosed = setInterval(() => {
+                        if (loginWindow.closed) {
+                            clearInterval(checkClosed);
+                            button.disabled = false;
+                            button.textContent = 'Open BPM Login Window';
+                            button.style.background = '#1976d2';
+                        }
+                    }, 1000);
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error opening BPM window:', error);
+                alert('Error opening window: ' + error.message + '\n\nPlease try manually opening: ' + bpmUrl);
+            }
+        }
+
+        function checkIfLoggedIn() {
+            // Check if user has auth in session (they might have used bookmarklet)
+            fetch('{% url "itsr_check_auth" %}')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.has_auth) {
+                        // Already authenticated!
+                        const statusDiv = document.getElementById('statusMessage');
+                        statusDiv.innerHTML = '<p style="margin: 0;"><strong>✓ Authentication found!</strong></p><p style="margin: 10px 0 0 0;">Closing window...</p>';
+                        statusDiv.className = 'status show';
+                        statusDiv.style.background = '#d4edda';
+                        statusDiv.style.color = '#155724';
+                        
+                        if (window.opener) {
+                            window.opener.postMessage({type: 'itsr_auth_success'}, '*');
+                        }
+                        setTimeout(() => window.close(), 1500);
+                    } else {
+                        alert('No authentication found.\n\nPlease:\n1. Make sure you are logged into BPM in the other window\n2. Drag the bookmarklet to your bookmarks bar\n3. Click the bookmarklet while on the BPM page');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking auth:', error);
+                    alert('Error checking authentication status. Please try again.');
+                });
+        }
+
+        function submitManualTokensFromInitial(e) {
+            console.log('=== submitManualTokensFromInitial called ===');
+            
+            // Prevent default form submission if called from event
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            const accessTokenInput = document.getElementById('manualAccessTokenInitial');
+            const uidInput = document.getElementById('manualUidInitial');
+            
+            console.log('Access Token Input:', accessTokenInput);
+            console.log('UID Input:', uidInput);
+            
+            if (!accessTokenInput || !uidInput) {
+                alert('Error: Form fields not found. Please refresh the page.');
+                console.error('Form fields not found');
+                return false;
+            }
+            
+            const accessToken = accessTokenInput.value.trim();
+            const uid = uidInput.value.trim();
+            
+            console.log('Access Token length:', accessToken.length);
+            console.log('UID:', uid);
+            
+            if (!accessToken || !uid) {
+                alert('Please enter both SY_ACCESS_TOKEN and SY_UID');
+                return false;
+            }
+            
+            // Disable button to prevent double submission
+            const submitBtn = document.getElementById('submitTokensBtnInitial');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '⏳ Submitting...';
+            }
+            
+            submitTokensToServer(accessToken, uid, submitBtn);
+            return false;
+        }
+
+        function submitManualTokens() {
+            console.log('submitManualTokens called');
+            const accessTokenInput = document.getElementById('manualAccessToken');
+            const uidInput = document.getElementById('manualUid');
+            
+            if (!accessTokenInput || !uidInput) {
+                alert('Error: Form fields not found. Please refresh the page.');
+                console.error('Form fields not found');
+                return;
+            }
+            
+            const accessToken = accessTokenInput.value.trim();
+            const uid = uidInput.value.trim();
+            
+            if (!accessToken || !uid) {
+                alert('Please enter both SY_ACCESS_TOKEN and SY_UID');
+                return;
+            }
+            
+            // Disable button to prevent double submission
+            const submitBtn = event.target;
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Submitting...';
+            
+            submitTokensToServer(accessToken, uid, submitBtn);
+        }
+        
+        function submitTokensToServer(accessToken, uid, submitBtn, syCinfo) {
+            
+            if (!accessToken || !uid) {
+                alert('Please enter both SY_ACCESS_TOKEN and SY_UID');
+                return;
+            }
+            
+            // Use provided sy-cinfo or default
+            const finalSyCinfo = syCinfo || 'C4wfMXAR9mXTBKV1LQuL1w==';
+            console.log('Using sy-cinfo:', finalSyCinfo);
+            
+            // Show status message (create if doesn't exist)
+            let statusDiv = document.getElementById('statusMessage');
+            if (!statusDiv) {
+                // Create status div if it doesn't exist (for initial state)
+                statusDiv = document.createElement('div');
+                statusDiv.id = 'statusMessage';
+                statusDiv.className = 'status show';
+                statusDiv.style.marginTop = '20px';
+                statusDiv.style.padding = '15px';
+                statusDiv.style.borderRadius = '6px';
+                statusDiv.style.display = 'block';
+                statusDiv.style.zIndex = '1000';
+                const formDiv = document.querySelector('#manualAccessTokenInitial, #manualAccessToken').closest('div[style*="background: #fff"]');
+                if (formDiv && formDiv.parentNode) {
+                    formDiv.parentNode.insertBefore(statusDiv, formDiv);
+                } else {
+                    // Fallback: append to body
+                    document.body.appendChild(statusDiv);
+                }
+            }
+            
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<p style="margin: 0; font-size: 16px;"><strong>⏳ Sending tokens to server...</strong></p><p style="margin: 5px 0 0 0; font-size: 12px;">Please wait...</p>';
+            statusDiv.className = 'status show';
+            statusDiv.style.background = '#e3f2fd';
+            statusDiv.style.color = '#1976d2';
+            statusDiv.style.border = '2px solid #1976d2';
+            
+            console.log('Submitting tokens to:', callbackUrl);
+            console.log('Access Token length:', accessToken.length);
+            console.log('UID:', uid);
+            
+            const csrftoken = getCookie('csrftoken');
+            console.log('CSRF Token:', csrftoken ? 'Found' : 'NOT FOUND');
+            
+            fetch(callbackUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken || ''
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    access_token: accessToken,
+                    uid: uid,
+                    sy_cinfo: finalSyCinfo
+                })
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('Error response:', text);
+                        throw new Error('HTTP ' + response.status + ': ' + text.substring(0, 200));
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    statusDiv.innerHTML = '<p style="margin: 0; font-size: 18px;"><strong>✓✓✓ Authentication Successful!</strong></p><p style="margin: 10px 0 0 0; font-size: 14px;">Tokens saved. Closing window in 2 seconds...</p>';
+                    statusDiv.style.background = '#d4edda';
+                    statusDiv.style.color = '#155724';
+                    statusDiv.style.border = '2px solid #28a745';
+                    
+                    if (submitBtn) {
+                        submitBtn.textContent = '✓ Success!';
+                        submitBtn.style.background = '#28a745';
+                    }
+                    
+                    if (window.opener) {
+                        window.opener.postMessage({type: 'itsr_auth_success'}, '*');
+                    }
+                    setTimeout(() => {
+                        window.close();
+                    }, 2000);
+                } else {
+                    const errorMsg = data.message || 'Unknown error';
+                    alert('✗ Error: ' + errorMsg);
+                    statusDiv.innerHTML = '<p style="margin: 0; font-size: 16px;"><strong>✗ Error: ' + errorMsg + '</strong></p><p style="margin: 10px 0 0 0; font-size: 12px;">Please check the browser console (F12) for more details.</p>';
+                    statusDiv.style.background = '#f8d7da';
+                    statusDiv.style.color = '#721c24';
+                    statusDiv.style.border = '2px solid #dc3545';
+                    
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '✅ Submit Tokens & Complete Authentication';
+                        submitBtn.style.background = '#c2185b';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                const errorMsg = error.message || 'Network error';
+                alert('✗ Error sending authentication:\n\n' + errorMsg + '\n\nPlease check:\n1. Your internet connection\n2. Browser console (F12) for details\n3. Try refreshing the page');
+                statusDiv.innerHTML = '<p style="margin: 0; font-size: 16px;"><strong>✗ Error: ' + errorMsg + '</strong></p><p style="margin: 10px 0 0 0; font-size: 12px;">Check browser console (F12) for details.</p>';
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#721c24';
+                statusDiv.style.border = '2px solid #dc3545';
+                
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✅ Submit Tokens & Complete Authentication';
+                    submitBtn.style.background = '#c2185b';
+                }
+            });
+        }
+
+        function getCookie(name) {
+            const value = "; " + document.cookie;
+            const parts = value.split("; " + name + "=");
+            if (parts.length === 2) return parts.pop().split(";").shift();
+            return null;
+        }
+
+        // Listen for auth success message (from bookmarklet)
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'itsr_auth_success') {
+                // Auth successful, close this window
+                setTimeout(() => {
+                    window.close();
+                }, 1000);
+            }
+        });
+    </script>
+</body>
+</html>
