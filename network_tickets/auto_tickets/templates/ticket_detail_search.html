@@ -1,102 +1,7 @@
 {% extends 'base.html' %}
 
 {% block head %}
-    <script>
-    // Function to handle close button click - defined early so it's available for onclick handlers
-    function handleCloseTicketsClick(e) {
-        try {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            console.log('=== Close button clicked ===');
-            console.log('Event:', e);
-            
-            const checkboxes = document.querySelectorAll('.ticket-checkbox');
-            console.log('Total checkboxes found:', checkboxes.length);
-            const checked = Array.from(checkboxes).filter(cb => cb.checked && !cb.disabled);
-            console.log('Found', checked.length, 'checked tickets');
-            console.log('Checked ticket IDs:', checked.map(cb => cb.value));
-            
-            if (checked.length === 0) {
-                alert('Please select at least one ticket first.');
-                return false;
-            }
-            
-            const btn = document.getElementById('close-tickets-btn');
-            if (btn) {
-                btn.disabled = false;
-                btn.removeAttribute('disabled');
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-                btn.style.pointerEvents = 'auto';
-                btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                btn.innerHTML = '<i class="fas fa-lock-open me-2"></i>Close Tickets in ITSR';
-            }
-            
-            const form = document.getElementById('close-tickets-form');
-            console.log('Form found?', !!form);
-            if (!form) {
-                alert('Error: Form not found. Please refresh the page.');
-                console.error('close-tickets-form not found!');
-                return false;
-            }
-            
-            console.log('Form exists, proceeding with submission setup...');
-            
-            // Clear any existing ticket_ids inputs (except checkboxes)
-            form.querySelectorAll('input[name="ticket_ids"][type="hidden"]').forEach(function(input) {
-                input.remove();
-            });
-            
-            // Set the ticket IDs
-            checked.forEach(function(cb) {
-                const hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = 'ticket_ids';
-                hiddenInput.value = cb.value;
-                form.appendChild(hiddenInput);
-            });
-            
-            // Set select_all flag
-            const selectAllInput = document.getElementById('select-all-hidden');
-            if (selectAllInput) {
-                const enabledCheckboxes = Array.from(checkboxes).filter(cb => !cb.disabled);
-                selectAllInput.value = (checked.length === enabledCheckboxes.length && enabledCheckboxes.length > 0) ? 'true' : 'false';
-            }
-            
-            // Ensure close_tickets_itsr flag is set
-            if (!form.querySelector('input[name="close_tickets_itsr"]')) {
-                const flagInput = document.createElement('input');
-                flagInput.type = 'hidden';
-                flagInput.name = 'close_tickets_itsr';
-                flagInput.value = '1';
-                form.appendChild(flagInput);
-            }
-            
-            console.log('Submitting form with', checked.length, 'ticket(s)');
-            console.log('Form action:', form.action);
-            console.log('Form method:', form.method);
-            
-            // Show confirmation
-            const confirmMsg = 'Are you sure you want to close ' + checked.length + ' ticket(s) in ITSR?';
-            if (!confirm(confirmMsg)) {
-                console.log('User cancelled');
-                return false;
-            }
-            
-            form.submit();
-            console.log('Form submitted');
-            return false;
-        } catch(error) {
-            console.error('Error in handleCloseTicketsClick:', error);
-            alert('Error: ' + error.message + '\n\nCheck console for details.');
-            return false;
-        }
-    }
-    console.log('handleCloseTicketsClick function defined');
-    </script>
-    <style type="text/css">
+<style type="text/css">
     label.required::before {
         content: "*";
         color: red;
@@ -204,7 +109,8 @@
         background: white;
         border-radius: 0.75rem;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        overflow: hidden;
+        /* Allow file dropdown menus to extend outside the table container */
+        overflow: visible;
     }
     
     .results-table-header {
@@ -369,6 +275,14 @@
         padding: 0.5rem;
     }
     
+    /* If dropdown is near bottom, open upward */
+    .files-dropdown.dropup .files-dropdown-menu {
+        top: auto;
+        bottom: 100%;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+    }
+
     .files-dropdown.active .files-dropdown-menu {
         display: block;
     }
@@ -555,6 +469,210 @@
         padding: 1rem 1.5rem;
         margin-bottom: 1.5rem;
     }
+    
+    /* Ensure modal is interactive */
+    .modal {
+        pointer-events: none !important;
+    }
+    
+    .modal.show {
+        display: block !important;
+        pointer-events: auto !important;
+        z-index: 1055 !important;
+    }
+    
+    .modal.show .modal-dialog {
+        pointer-events: auto !important;
+        position: relative;
+        z-index: 1056 !important;
+    }
+    
+    .modal.show .modal-content {
+        pointer-events: auto !important;
+        position: relative;
+        z-index: 1057 !important;
+        background-color: #ffffff !important; /* Pure white background */
+    }
+    
+    .modal.show .modal-header {
+        z-index: 1058 !important; /* Ensure header is above content */
+        position: relative !important;
+        background-color: #ffffff !important; /* Pure white header */
+    }
+    
+    .modal.show .modal-body {
+        background-color: #ffffff !important; /* Pure white body */
+    }
+    
+    .modal.show .modal-footer {
+        background-color: #ffffff !important; /* Pure white footer */
+    }
+    
+    .modal.show .modal-dialog {
+        margin-top: 80px !important; /* Move modal down when shown */
+    }
+    
+    .modal.show * {
+        pointer-events: auto !important;
+    }
+    
+    .modal.show input,
+    .modal.show button,
+    .modal.show textarea,
+    .modal.show select,
+    .modal.show label,
+    .modal.show a {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+    }
+    
+    .modal.show input[type="text"],
+    .modal.show input[type="password"] {
+        cursor: text !important;
+    }
+    
+    .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1050 !important;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        pointer-events: none !important; /* Allow clicks to pass through to modal content */
+    }
+    
+    /* Ensure modal content is above backdrop and interactive */
+    .modal {
+        z-index: 1055 !important;
+        pointer-events: auto !important;
+    }
+    
+    .modal-dialog {
+        z-index: 1056 !important;
+        pointer-events: auto !important;
+        margin-top: 80px !important; /* Move modal down */
+    }
+    
+    .modal-content {
+        z-index: 1057 !important;
+        pointer-events: auto !important;
+        background-color: #ffffff !important; /* Pure white background */
+        border: 1px solid #d0d0d0 !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+    }
+    
+    .modal-header {
+        background-color: #ffffff !important; /* Pure white header */
+        border-bottom: 1px solid #e0e0e0 !important;
+        z-index: 1058 !important; /* Ensure header is above content */
+        position: relative !important;
+    }
+    
+    .modal-body {
+        background-color: #ffffff !important; /* Pure white body */
+        padding: 1.5rem !important;
+    }
+    
+    .modal-footer {
+        background-color: #ffffff !important; /* Pure white footer */
+        border-top: 1px solid #e0e0e0 !important;
+    }
+    
+    .modal-title {
+        color: #212529 !important; /* Dark text for contrast */
+        font-weight: 600 !important;
+    }
+    
+    .alert-info {
+        background-color: #d1ecf1 !important; /* Lighter blue for info alerts */
+        border-color: #bee5eb !important;
+        color: #0c5460 !important;
+    }
+    
+    .modal-backdrop.show {
+        opacity: 0.5;
+    }
+    
+    /* Ensure nothing else is blocking */
+    body.modal-open {
+        overflow: hidden;
+    }
+    
+    body.modal-open .modal {
+        pointer-events: auto !important;
+    }
+    
+    /* Ensure username and password fields are always interactive */
+    #itsr-username,
+    #itsr-password {
+        pointer-events: auto !important;
+        opacity: 1 !important;
+        cursor: text !important;
+        z-index: 9999 !important;
+        position: relative !important;
+    }
+    
+    /* Ensure submit button is always clickable */
+    #submit-credentials-btn,
+    #submit-sms-btn {
+        pointer-events: auto !important;
+        cursor: pointer !important;
+    }
+    
+    #submit-credentials-btn:not(:disabled),
+    #submit-sms-btn:not(:disabled) {
+        opacity: 1 !important;
+    }
+    
+    #itsr-username:disabled,
+    #itsr-password:disabled {
+        pointer-events: auto !important;
+        opacity: 1 !important;
+        cursor: text !important;
+    }
+    
+    #itsr-username[disabled],
+    #itsr-password[disabled] {
+        pointer-events: auto !important;
+        opacity: 1 !important;
+        cursor: text !important;
+    }
+    
+    /* Ensure form elements in modal are always interactive */
+    #itsrCredentialsModal input,
+    #itsrCredentialsModal button,
+    #itsrCredentialsModal textarea,
+    #itsrCredentialsModal select {
+        pointer-events: auto !important;
+    }
+    
+    #itsrCredentialsModal input:disabled,
+    #itsrCredentialsModal button:disabled {
+        pointer-events: auto !important;
+        opacity: 1 !important;
+    }
+
+    /* Close-ITSR mode: make selected ITSR Status prominent */
+    .itsr-status-select {
+        font-weight: 800;
+        letter-spacing: 0.2px;
+    }
+    .itsr-status-select.status-open {
+        background-color: #ecfdf5; /* emerald-50 */
+        border-color: #34d399;     /* emerald-400 */
+        color: #065f46;            /* emerald-800 */
+    }
+    .itsr-status-select.status-closed {
+        background-color: #fef2f2; /* red-50 */
+        border-color: #f87171;     /* red-400 */
+        color: #7f1d1d;            /* red-900 */
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
     </style>
 {% endblock head %}
 
@@ -660,32 +778,17 @@
         
         {% if has_results %}
             {% if show_close_button or close_itsr_mode %}
-                <form method="post" id="close-tickets-form">
-                    {% csrf_token %}
-                    <input type="hidden" name="close_tickets_itsr" value="1">
-                    <input type="hidden" name="handler" value="{{ handler }}">
-                    <input type="hidden" name="select_all" id="select-all-hidden" value="false">
-                    {% if itsr_status %}
-                        <input type="hidden" name="itsr_status" value="{{ itsr_status }}">
-                    {% endif %}
-                    {% if close_itsr_mode %}
-                        <input type="hidden" name="close_itsr_mode" value="true">
-                    {% endif %}
+                {% csrf_token %}
+                <input type="hidden" name="handler" value="{{ handler }}" id="handler-hidden">
+                {% if itsr_status %}
+                    <input type="hidden" name="itsr_status" value="{{ itsr_status }}" id="itsr-status-hidden">
+                {% endif %}
             {% endif %}
             
             <div class="mb-3 d-flex justify-content-between align-items-center">
-                <h3><i class="fas fa-list me-2"></i>Search Results ({{ tickets_with_files|length }})</h3>
+                <h3 id="search-results-title"><i class="fas fa-list me-2"></i>Search Results ({{ tickets_with_files|length }})</h3>
                 {% if show_close_button or close_itsr_mode %}
-                    <button type="button" class="btn btn-submit" id="close-tickets-btn" style="cursor: pointer !important;" onclick="
-                        console.log('Close button onclick fired (fallback)');
-                        if (typeof handleCloseTicketsClick === 'function') {
-                            handleCloseTicketsClick(event);
-                        } else {
-                            console.error('handleCloseTicketsClick function not found!');
-                            alert('JavaScript not loaded. Please refresh the page.');
-                        }
-                        return false;
-                    ">
+                    <button type="button" class="btn btn-submit" id="close-tickets-btn" disabled>
                         <i class="fas fa-lock me-2"></i>Close Tickets in ITSR
                     </button>
                 {% endif %}
@@ -717,11 +820,16 @@
                 </div>
                 
                 {% for item in tickets_with_files %}
-                    <div class="results-table-row {% if show_close_button or close_itsr_mode %}with-checkbox{% endif %} {% if close_itsr_mode %}close-itsr-mode{% endif %}">
+                    <div class="results-table-row {% if show_close_button or close_itsr_mode %}with-checkbox{% endif %} {% if close_itsr_mode %}close-itsr-mode{% endif %}"
+                         data-ticket-id="{{ item.ticket.id }}"
+                         data-ticket-number="{{ item.ticket.itsr_ticket_number }}"
+                         data-itsr-status="{{ item.ticket.itsr_status }}">
                         {% if show_close_button or close_itsr_mode %}
                             <div class="ticket-cell" style="text-align: center; justify-content: center;">
                                 <input type="checkbox" name="ticket_ids" value="{{ item.ticket.id }}" class="ticket-checkbox form-check-input" 
-                                       {% if item.ticket.itsr_status == 'closed' %}disabled title="Ticket already closed"{% endif %}>
+                                       {% if item.ticket.itsr_status == 'closed' %}disabled title="Ticket already closed"{% endif %}
+                                       onchange="setTimeout(function(){ if(typeof window.syncCloseButton === 'function') window.syncCloseButton(); }, 0);"
+                                       onclick="setTimeout(function(){ if(typeof window.syncCloseButton === 'function') window.syncCloseButton(); }, 0);">
                             </div>
                         {% endif %}
                         <div class="ticket-cell">
@@ -758,9 +866,19 @@
                             {% endif %}
                         </div>
                         <div class="ticket-cell">
-                            <span class="status-badge status-{{ item.ticket.itsr_status }}">
-                                {{ item.ticket.get_itsr_status_display }}
-                            </span>
+                            {% if close_itsr_mode %}
+                                <select class="form-select form-select-sm itsr-status-select"
+                                        data-ticket-id="{{ item.ticket.id }}"
+                                        data-ticket-number="{{ item.ticket.itsr_ticket_number }}"
+                                        style="min-width: 110px; font-size: 0.85rem;">
+                                    <option value="open" {% if item.ticket.itsr_status == 'open' %}selected{% endif %}>Open</option>
+                                    <option value="closed" {% if item.ticket.itsr_status == 'closed' %}selected{% endif %}>Closed</option>
+                                </select>
+                            {% else %}
+                                <span class="status-badge status-{{ item.ticket.itsr_status }}">
+                                    {{ item.ticket.get_itsr_status_display }}
+                                </span>
+                            {% endif %}
                         </div>
                         {% if not close_itsr_mode %}
                             <div class="ticket-cell description-cell">
@@ -786,13 +904,13 @@
                                                     <div class="file-info-compact">
                                                         <i class="fas fa-file file-icon-compact"></i>
                                                         <div class="file-details-compact">
-                                                            <span class="file-name-compact" title="{{ file.name }}">{{ file.name }}</span>
+                                                            <a href="{% url 'serve_itsr_file' filename=file.name %}" download class="file-name-compact file-download-link" title="{{ file.name }}" onclick="event.stopPropagation();">{{ file.name }}</a>
                                                             <span class="file-meta-compact">
                                                                 {{ file.size|filesizeformat }} • {{ file.date|date:"m/d H:i" }}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <a href="{% url 'serve_itsr_file' filename=file.name %}" target="_blank" class="btn btn-sm btn-outline-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                                                    <a href="{% url 'serve_itsr_file' filename=file.name %}" download class="btn btn-sm btn-outline-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation();">
                                                         <i class="fas fa-download"></i>
                                                     </a>
                                                 </div>
@@ -808,9 +926,6 @@
                 {% endfor %}
             </div>
             
-            {% if show_close_button or close_itsr_mode %}
-                </form>
-            {% endif %}
         {% elif request.method == 'POST' or request.GET.handler or request.GET.itsr_ticket_number or request.GET.itsr_status %}
             <div class="results-table">
                 <div class="no-results" style="padding: 3rem; text-align: center;">
@@ -823,8 +938,139 @@
     </div>
     
     <script>
-    // handleCloseTicketsClick is now defined in the head section
-    console.log('Main script loading, handleCloseTicketsClick available?', typeof handleCloseTicketsClick);
+    // Multi-step ITSR Close Workflow - Global variables
+    let currentSessionId = null;
+    let selectedTicketIds = [];
+    let selectedTicketNumbers = [];
+    
+    // Helper function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    function getCsrfToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCookie('csrftoken');
+    }
+    
+    // Simple function to update button state
+    window.updateCloseButtonState = function() {
+        const btn = document.getElementById('close-tickets-btn');
+        if (!btn) return;
+        
+        const allCheckboxes = document.querySelectorAll('.ticket-checkbox');
+        const checked = Array.from(allCheckboxes).filter(cb => cb.checked && !cb.disabled);
+        
+        if (checked.length > 0) {
+            btn.disabled = false;
+            btn.removeAttribute('disabled');
+            btn.classList.remove('disabled');
+            btn.style.setProperty('opacity', '1', 'important');
+            btn.style.setProperty('cursor', 'pointer', 'important');
+            btn.style.setProperty('pointer-events', 'auto', 'important');
+            btn.style.setProperty('background', 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 'important');
+            btn.innerHTML = '<i class="fas fa-lock-open me-2"></i>Close Tickets in ITSR';
+        } else {
+            btn.disabled = true;
+            btn.setAttribute('disabled', 'disabled');
+            btn.style.opacity = '0.6';
+            btn.style.cursor = 'not-allowed';
+            // Don't block pointer events; rely on disabled attribute only
+            btn.style.pointerEvents = 'auto';
+            btn.innerHTML = '<i class="fas fa-lock me-2"></i>Close Tickets in ITSR (Select tickets first)';
+        }
+    };
+
+    // Single deterministic sync function (prevents “click multiple times” issues)
+    window.syncCloseButton = function() {
+        const btn = document.getElementById('close-tickets-btn');
+        if (!btn) return;
+
+        const allCheckboxes = document.querySelectorAll('.ticket-checkbox');
+        const checked = Array.from(allCheckboxes).filter(cb => cb && cb.checked && !cb.disabled);
+        const enable = checked.length > 0;
+
+        btn.disabled = !enable;
+        if (enable) {
+            btn.removeAttribute('disabled');
+            btn.classList.remove('disabled');
+            btn.style.setProperty('opacity', '1', 'important');
+            btn.style.setProperty('cursor', 'pointer', 'important');
+            btn.style.setProperty('pointer-events', 'auto', 'important');
+            btn.style.setProperty('background', 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 'important');
+            btn.innerHTML = '<i class="fas fa-lock-open me-2"></i>Close Tickets in ITSR';
+        } else {
+            btn.setAttribute('disabled', 'disabled');
+            btn.style.setProperty('opacity', '0.6', 'important');
+            btn.style.setProperty('cursor', 'not-allowed', 'important');
+            // Don't block pointer events; rely on disabled attribute only
+            btn.style.setProperty('pointer-events', 'auto', 'important');
+            btn.innerHTML = '<i class="fas fa-lock me-2"></i>Close Tickets in ITSR (Select tickets first)';
+        }
+    };
+
+    // Run sync on any checkbox interaction, reliably after DOM updates
+    (function() {
+        function scheduleSync() {
+            try { window.syncCloseButton(); } catch (e) {}
+            // Run again after the browser applies checkbox checked state
+            try { requestAnimationFrame(() => { try { window.syncCloseButton(); } catch (e) {} }); } catch (e) {}
+            setTimeout(() => { try { window.syncCloseButton(); } catch (e) {} }, 0);
+        }
+
+        ['change', 'input', 'click'].forEach(evt => {
+            document.addEventListener(evt, function(e) {
+                const t = e && e.target;
+                if (!t) return;
+                if (t.id === 'select-all-checkbox' || (t.closest && t.closest('.ticket-checkbox'))) {
+                    scheduleSync();
+                }
+            }, true); // capture
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            scheduleSync();
+            setTimeout(scheduleSync, 50);
+        });
+    })();
+    
+    // Force enable function for edge cases
+    window.forceEnableCloseButton = function() {
+        const btn = document.getElementById('close-tickets-btn');
+        if (!btn) {
+            console.warn('Close button not found');
+            return false;
+        }
+        
+        const allCheckboxes = document.querySelectorAll('.ticket-checkbox');
+        const checked = Array.from(allCheckboxes).filter(cb => cb.checked && !cb.disabled);
+        
+        if (checked.length > 0) {
+            btn.disabled = false;
+            btn.removeAttribute('disabled');
+            btn.classList.remove('disabled');
+            btn.style.setProperty('opacity', '1', 'important');
+            btn.style.setProperty('cursor', 'pointer', 'important');
+            btn.style.setProperty('pointer-events', 'auto', 'important');
+            btn.style.setProperty('background', 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 'important');
+            btn.innerHTML = '<i class="fas fa-lock-open me-2"></i>Close Tickets in ITSR';
+            return true;
+        }
+        return false;
+    };
+    
+    // Make functions globally available (defined below)
+    let submitCredentials, submitSmsCode, resetCloseButton, startCloseWorkflow;
     
     document.addEventListener('DOMContentLoaded', function() {
         // Handle checkbox selection for closing tickets
@@ -833,23 +1079,8 @@
         const closeTicketsBtn = document.getElementById('close-tickets-btn');
         const closeTicketsForm = document.getElementById('close-tickets-form');
         
-        // Attach click handler to close button
-        if (closeTicketsBtn) {
-            closeTicketsBtn.addEventListener('click', function(e) {
-                console.log('=== Close button clicked - event listener fired! ===');
-                console.log('Event:', e);
-                handleCloseTicketsClick(e);
-            });
-            console.log('✓ Close button click handler attached');
-            console.log('Button element:', closeTicketsBtn);
-            console.log('Button disabled?', closeTicketsBtn.disabled);
-        } else {
-            console.error('✗ closeTicketsBtn not found!');
-        }
-        
         // Update close button state - make it available globally
         function updateCloseButton() {
-            console.log('=== updateCloseButton called ===');
             const btn = document.getElementById('close-tickets-btn');
             if (!btn) {
                 console.error('closeTicketsBtn not found!');
@@ -858,36 +1089,38 @@
             
             // Re-query checkboxes in case they were added dynamically
             const allCheckboxes = document.querySelectorAll('.ticket-checkbox');
-            console.log('Total checkboxes found:', allCheckboxes.length);
             
             const checkedBoxes = Array.from(allCheckboxes).filter(cb => {
                 const isChecked = cb.checked;
                 const isDisabled = cb.disabled;
-                console.log('Checkbox:', cb.value, 'checked:', isChecked, 'disabled:', isDisabled);
                 return isChecked && !isDisabled;
             });
             
-            console.log('Checked boxes count:', checkedBoxes.length);
             const hasChecked = checkedBoxes.length > 0;
             
             // Force remove disabled attribute and update styles
             if (hasChecked) {
+                // Use the same aggressive approach as forceEnableCloseButton
                 btn.disabled = false;
                 btn.removeAttribute('disabled');
+                btn.classList.remove('disabled');
+                btn.style.setProperty('opacity', '1', 'important');
+                btn.style.setProperty('cursor', 'pointer', 'important');
+                btn.style.setProperty('pointer-events', 'auto', 'important');
+                btn.style.setProperty('background', 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 'important');
                 btn.innerHTML = '<i class="fas fa-lock-open me-2"></i>Close Tickets in ITSR';
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-                btn.style.pointerEvents = 'auto';
-                btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-                console.log('✓ Button ENABLED');
+                
+                // Force reflow to ensure styles apply
+                void btn.offsetHeight;
+                
             } else {
                 btn.disabled = true;
                 btn.setAttribute('disabled', 'disabled');
                 btn.innerHTML = '<i class="fas fa-lock me-2"></i>Close Tickets in ITSR (Select tickets first)';
                 btn.style.opacity = '0.6';
                 btn.style.cursor = 'not-allowed';
-                btn.style.pointerEvents = 'none';
-                console.log('✗ Button DISABLED');
+                // Don't block pointer events; rely on disabled attribute only
+                btn.style.pointerEvents = 'auto';
             }
         }
         
@@ -897,31 +1130,97 @@
         // Update select all checkbox state
         function updateSelectAllState() {
             if (!selectAllCheckbox) return;
-            const enabledCheckboxes = Array.from(ticketCheckboxes).filter(cb => !cb.disabled);
-            const checkedEnabled = Array.from(ticketCheckboxes).filter(cb => cb.checked && !cb.disabled);
+            // Re-query checkboxes in case they were added dynamically
+            const allCheckboxes = document.querySelectorAll('.ticket-checkbox');
+            const enabledCheckboxes = Array.from(allCheckboxes).filter(cb => !cb.disabled);
+            const checkedEnabled = Array.from(allCheckboxes).filter(cb => cb.checked && !cb.disabled);
             selectAllCheckbox.checked = enabledCheckboxes.length > 0 && checkedEnabled.length === enabledCheckboxes.length;
             selectAllCheckbox.indeterminate = checkedEnabled.length > 0 && checkedEnabled.length < enabledCheckboxes.length;
         }
         
         // Use event delegation on the document for maximum reliability
+        // Listen to multiple event types to catch all checkbox interactions
         document.addEventListener('change', function(e) {
-            if (e.target && (e.target.classList.contains('ticket-checkbox') || e.target.id === 'select-all-checkbox')) {
-                console.log('Checkbox change detected:', e.target.id || e.target.value, 'checked:', e.target.checked);
+            const target = e.target;
+            if (target && (target.classList.contains('ticket-checkbox') || target.id === 'select-all-checkbox')) {
                 updateSelectAllState();
                 updateCloseButton();
-            }
-        });
-        
-        // Also use click events as backup
-        document.addEventListener('click', function(e) {
-            if (e.target && (e.target.classList.contains('ticket-checkbox') || e.target.id === 'select-all-checkbox')) {
+                // Also try force enable as backup
                 setTimeout(function() {
-                    console.log('Checkbox click detected, updating button...');
-                    updateSelectAllState();
-                    updateCloseButton();
+                    window.forceEnableCloseButton();
                 }, 10);
             }
         });
+        
+        // Listen to input events (fires before change)
+        document.addEventListener('input', function(e) {
+            const target = e.target;
+            if (target && (target.classList.contains('ticket-checkbox') || target.id === 'select-all-checkbox')) {
+                setTimeout(function() {
+                    updateSelectAllState();
+                    updateCloseButton();
+                    window.forceEnableCloseButton();
+                }, 0);
+            }
+        });
+        
+        // Also use click events as backup - check parent elements too
+        document.addEventListener('click', function(e) {
+            const target = e.target;
+            const checkbox = target.closest('.ticket-checkbox') || 
+                           (target.classList.contains('ticket-checkbox') ? target : null) ||
+                           (target.id === 'select-all-checkbox' ? target : null);
+            
+            if (checkbox || (target && (target.classList.contains('ticket-checkbox') || target.id === 'select-all-checkbox'))) {
+                setTimeout(function() {
+                    updateSelectAllState();
+                    updateCloseButton();
+                    // Force enable as backup
+                    window.forceEnableCloseButton();
+                }, 50);
+            }
+        });
+        
+        // Attach click handler to close button - do this early so it's always available
+        // Use a wrapper that will call the function when it's available
+        if (closeTicketsBtn) {
+            const alreadyBound = !!(closeTicketsBtn.dataset && closeTicketsBtn.dataset.itsrCloseBound === '1');
+            if (!alreadyBound) {
+                if (closeTicketsBtn.dataset) closeTicketsBtn.dataset.itsrCloseBound = '1';
+                closeTicketsBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Try multiple ways to call the function
+                    if (typeof window.startCloseWorkflow === 'function') {
+                        window.startCloseWorkflow();
+                    } else if (typeof startCloseWorkflow === 'function') {
+                        startCloseWorkflow();
+                    } else {
+                        console.error('startCloseWorkflow function not available');
+                        alert('Error: Close workflow function not available. Please refresh the page.');
+                    }
+                });
+            }
+        }
+        
+        // Initial state - check immediately and also after a short delay
+        // This runs regardless of whether checkboxes are found initially
+        if (closeTicketsBtn) {
+            
+            updateCloseButton();
+            if (selectAllCheckbox) {
+                updateSelectAllState();
+            }
+            
+            // Also check after a short delay in case checkboxes are rendered later
+            setTimeout(function() {
+                updateCloseButton();
+                if (selectAllCheckbox) {
+                    updateSelectAllState();
+                }
+            }, 500);
+        }
         
         if (ticketCheckboxes.length > 0) {
             // Select all functionality
@@ -941,51 +1240,98 @@
             // Also attach directly to each checkbox as backup
             ticketCheckboxes.forEach(function(checkbox) {
                 checkbox.addEventListener('change', function() {
-                    console.log('Direct checkbox event:', checkbox.value, 'checked:', checkbox.checked);
+                    // Update immediately
                     updateSelectAllState();
                     updateCloseButton();
+                    // Also update after a short delay to catch any async changes
+                    setTimeout(function() {
+                        updateSelectAllState();
+                        updateCloseButton();
+                    }, 50);
                 });
-                checkbox.addEventListener('click', function() {
+                checkbox.addEventListener('click', function(e) {
+                    // Update after click state is set
                     setTimeout(function() {
                         updateSelectAllState();
                         updateCloseButton();
                     }, 10);
                 });
+                checkbox.addEventListener('input', function() {
+                    setTimeout(function() {
+                        updateSelectAllState();
+                        updateCloseButton();
+                    }, 0);
+                });
             });
             
-            // Periodic check every 2 seconds as ultimate fallback
+            // Periodic check every 500ms as ultimate fallback
             setInterval(function() {
                 const allBoxes = document.querySelectorAll('.ticket-checkbox');
                 const checked = Array.from(allBoxes).filter(cb => cb.checked && !cb.disabled);
-                if (checked.length > 0 && closeTicketsBtn && closeTicketsBtn.disabled) {
-                    console.log('Periodic check: Found', checked.length, 'checked boxes, enabling button');
-                    updateCloseButton();
+                const btn = document.getElementById('close-tickets-btn');
+                if (btn) {
+                    // Always update button state, not just when it's disabled
+                    // This ensures the button state stays in sync
+                    const shouldBeEnabled = checked.length > 0;
+                    const isCurrentlyEnabled = !btn.disabled;
+                    if (shouldBeEnabled !== isCurrentlyEnabled) {
+                        updateCloseButton();
+                    }
                 }
-            }, 2000);
+            }, 500);
             
-            // Check authentication before closing tickets
-            function checkAuthAndSubmit(e) {
-                e.preventDefault();
-                e.stopPropagation();
+            // Use MutationObserver to watch for checkbox changes
+            if (closeTicketsBtn) {
+                const observer = new MutationObserver(function(mutations) {
+                    let shouldUpdate = false;
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'checked') {
+                            shouldUpdate = true;
+                        }
+                    });
+                    if (shouldUpdate) {
+                        setTimeout(function() {
+                            updateCloseButton();
+                            updateSelectAllState();
+                        }, 10);
+                    }
+                });
                 
-                console.log('=== Close Tickets button clicked ===');
-                
-                const checkedBoxes = Array.from(ticketCheckboxes).filter(cb => cb.checked && !cb.disabled);
-                const enabledCheckboxes = Array.from(ticketCheckboxes).filter(cb => !cb.disabled);
-                const selectAllHidden = document.getElementById('select-all-hidden');
-                
-                console.log('Checked boxes:', checkedBoxes.length);
+                // Observe all checkboxes
+                ticketCheckboxes.forEach(function(checkbox) {
+                    observer.observe(checkbox, {
+                        attributes: true,
+                        attributeFilter: ['checked']
+                    });
+                });
+            }
+            
+            // ============================================================
+            // Multi-step ITSR Close Workflow
+            // ============================================================
+            
+            // Step 1: Create close session
+            function startCloseWorkflow() {
+                // Re-query checkboxes to get current state
+                const allCheckboxes = document.querySelectorAll('.ticket-checkbox');
+                const checkedBoxes = Array.from(allCheckboxes).filter(cb => cb.checked && !cb.disabled);
+                const enabledCheckboxes = Array.from(allCheckboxes).filter(cb => !cb.disabled);
                 
                 if (checkedBoxes.length === 0) {
                     alert('Please select at least one ticket to close.');
-                    return false;
+                    return;
                 }
+
+                // Prevent duplicate confirms / duplicate session creation
+                if (window._itsrCloseWorkflowActive) {
+                    return;
+                }
+                window._itsrCloseWorkflowActive = true;
                 
                 // Check if select all is active
                 const isSelectAll = enabledCheckboxes.length > 0 && checkedBoxes.length === enabledCheckboxes.length;
-                if (selectAllHidden) {
-                    selectAllHidden.value = isSelectAll ? 'true' : 'false';
-                }
+                const handler = document.getElementById('handler-hidden')?.value || '';
+                const itsrStatus = document.getElementById('itsr-status-hidden')?.value || '';
                 
                 // Confirm action
                 const confirmMsg = isSelectAll 
@@ -993,98 +1339,1665 @@
                     : `Are you sure you want to close ${checkedBoxes.length} ticket(s) in ITSR?`;
                 
                 if (!confirm(confirmMsg)) {
-                    console.log('User cancelled');
-                    return false;
+                    window._itsrCloseWorkflowActive = false;
+                    return;
                 }
                 
-                console.log('Checking authentication...');
+                // Collect ticket IDs
+                selectedTicketIds = checkedBoxes.map(cb => cb.value);
                 
-                // Check if user has ITSR authentication
-                fetch('{% url "itsr_check_auth" %}')
-                    .then(response => {
-                        console.log('Auth check response status:', response.status);
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Auth check result:', data);
+                // Prepare request data
+                const requestData = {
+                    ticket_ids: selectedTicketIds,
+                    select_all: isSelectAll,
+                    update_db: true
+                };
+                
+                if (isSelectAll && handler) {
+                    requestData.handler = handler;
+                }
+                
+                // Disable button and show loading
+                closeTicketsBtn.disabled = true;
+                closeTicketsBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating session...';
+                
+                // Call API to create session
+                fetch('{% url "itsr_close_create_session" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify(requestData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentSessionId = data.session_id;
+                        selectedTicketNumbers = data.ticket_numbers;
                         
-                        // Show SMS input modal instead of popup
-                        console.log('Showing SMS authentication modal...');
-                        const smsModalElement = document.getElementById('itsrSmsAuthModal');
-                        if (smsModalElement) {
-                            let smsModal = bootstrap.Modal.getInstance(smsModalElement);
-                            if (!smsModal) {
-                                smsModal = new bootstrap.Modal(smsModalElement);
-                            }
-                            smsModal.show();
+                        // Show credentials modal
+                        showCredentialsModal();
+                    } else {
+                        alert('Error: ' + (data.error || 'Failed to create session'));
+                        resetCloseButton();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating session:', error);
+                    alert('Error creating session. Please try again.');
+                    resetCloseButton();
+                });
+            }
+            
+            // Step 2: Show credentials modal
+            function showCredentialsModal() {
+                const modal = document.getElementById('itsrCredentialsModal');
+                if (modal) {
+                    // Reset form
+                    const usernameEl = document.getElementById('itsr-username');
+                    const passwordEl = document.getElementById('itsr-password');
+                    if (usernameEl) {
+                        usernameEl.value = '';
+                        usernameEl.disabled = false;
+                        usernameEl.removeAttribute('disabled');
+                        usernameEl.readOnly = false;
+                        usernameEl.removeAttribute('readonly');
+                    }
+                    if (passwordEl) {
+                        passwordEl.value = '';
+                        passwordEl.disabled = false;
+                        passwordEl.removeAttribute('disabled');
+                        passwordEl.readOnly = false;
+                        passwordEl.removeAttribute('readonly');
+                    }
+                    
+                    const errorDiv = document.getElementById('credentials-error');
+                    const successDiv = document.getElementById('credentials-success');
+                    if (errorDiv) errorDiv.classList.add('d-none');
+                    if (successDiv) successDiv.classList.add('d-none');
+                    
+                    // Add protection for input fields - prevent them from being disabled
+                    if (usernameEl) {
+                        
+                        // Override the disabled property setter - more aggressive approach
+                        try {
+                            // Store original descriptor
+                            const originalDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'disabled');
                             
-                            // Store form reference for submission after auth
-                            window.pendingCloseTicketsForm = closeTicketsForm;
-                        } else {
-                            console.error('SMS modal element not found!');
-                            alert('Error: SMS authentication modal not found. Please refresh the page.');
+                            // Override on the specific element
+                            Object.defineProperty(usernameEl, 'disabled', {
+                                get: function() { 
+                                    // Always return false
+                                    return false; 
+                                },
+                                set: function(value) {
+                                    // Never allow it to be disabled - always set to false
+                                    if (originalDescriptor && originalDescriptor.set) {
+                                        originalDescriptor.set.call(this, false);
+                                    } else {
+                                        // Fallback: remove attribute
+                                        this.removeAttribute('disabled');
+                                    }
+                                },
+                                configurable: true,
+                                enumerable: true
+                            });
+                            
+                            // Also override readonly
+                            const originalReadonly = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'readOnly');
+                            Object.defineProperty(usernameEl, 'readOnly', {
+                                get: function() { return false; },
+                                set: function(value) {
+                                    // Only log if trying to set readOnly (value is true)
+                                    if (value === true) {
+                                    }
+                                    if (originalReadonly && originalReadonly.set) {
+                                        originalReadonly.set.call(this, false);
+                                    } else {
+                                        this.removeAttribute('readonly');
+                                    }
+                                },
+                                configurable: true,
+                                enumerable: true
+                            });
+                            
+                        } catch(e) {
                         }
+                        
+                        // Watch for disabled attribute changes
+                        const usernameObserver = new MutationObserver(function(mutations) {
+                            mutations.forEach(function(mutation) {
+                                if (mutation.type === 'attributes' && (mutation.attributeName === 'disabled' || mutation.attributeName === 'readonly')) {
+                                    if (usernameEl.disabled || usernameEl.readOnly) {
+                                        usernameEl.disabled = false;
+                                        usernameEl.readOnly = false;
+                                        usernameEl.removeAttribute('disabled');
+                                        usernameEl.removeAttribute('readonly');
+                                        usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                }
+                            });
+                            
+                            // Also check the actual disabled state
+                            if (usernameEl.disabled || usernameEl.readOnly) {
+                                usernameEl.disabled = false;
+                                usernameEl.readOnly = false;
+                                usernameEl.removeAttribute('disabled');
+                                usernameEl.removeAttribute('readonly');
+                            }
+                        });
+                        usernameObserver.observe(usernameEl, {
+                            attributes: true,
+                            attributeFilter: ['disabled', 'readonly', 'style'],
+                            attributeOldValue: true
+                        });
+                        
+                        // Add event listeners to keep it enabled
+                        usernameEl.addEventListener('blur', function() {
+                            setTimeout(function() {
+                                if (usernameEl.disabled || usernameEl.readOnly) {
+                                    usernameEl.disabled = false;
+                                    usernameEl.readOnly = false;
+                                    usernameEl.removeAttribute('disabled');
+                                    usernameEl.removeAttribute('readonly');
+                                    usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                            }, 10);
+                        }, true);
+                        
+                        usernameEl.addEventListener('focus', function() {
+                            usernameEl.disabled = false;
+                            usernameEl.readOnly = false;
+                            usernameEl.removeAttribute('disabled');
+                            usernameEl.removeAttribute('readonly');
+                            usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                            
+                            // Ensure field is editable
+                            usernameEl.setAttribute('contenteditable', 'false'); // Remove if present
+                            usernameEl.removeAttribute('contenteditable');
+                            
+                            // Force enable by setting value (if empty)
+                            if (!usernameEl.value) {
+                                usernameEl.value = '';
+                            }
+                            
+                            
+                            // Test if we can type immediately
+                            setTimeout(function() {
+                                try {
+                                    // Try to simulate a keypress
+                                    var testEvent = new KeyboardEvent('keydown', {
+                                        key: 'a',
+                                        code: 'KeyA',
+                                        keyCode: 65,
+                                        which: 65,
+                                        bubbles: true,
+                                        cancelable: true
+                                    });
+                                    var dispatched = usernameEl.dispatchEvent(testEvent);
+                                } catch(e) {
+                                }
+                            }, 10);
+                        }, true);
+                        
+                        usernameEl.addEventListener('input', function(e) {
+                        }, true); // Use capture phase
+                        
+                        usernameEl.addEventListener('keydown', function(e) {
+                            // If default is prevented, try to allow it
+                            if (e.defaultPrevented) {
+                                e.stopImmediatePropagation();
+                            }
+                        }, true); // Use capture phase
+                        
+                        usernameEl.addEventListener('keypress', function(e) {
+                            if (e.defaultPrevented) {
+                                e.stopImmediatePropagation();
+                            }
+                        }, true); // Use capture phase
+                        
+                        usernameEl.addEventListener('keyup', function(e) {
+                        }, true); // Use capture phase
+                        
+                        // Also add a global keyboard listener to see if events are reaching the document
+                        var globalKeyListener = function(e) {
+                            if (document.activeElement === usernameEl) {
+                            }
+                        };
+                        document.addEventListener('keydown', globalKeyListener, true);
+                        
+                        // Store reference to remove later if needed
+                        usernameEl._globalKeyListener = globalKeyListener;
+                        
+                        usernameEl.addEventListener('click', function() {
+                            setTimeout(function() {
+                                if (usernameEl.disabled || usernameEl.readOnly) {
+                                    usernameEl.disabled = false;
+                                    usernameEl.readOnly = false;
+                                    usernameEl.removeAttribute('disabled');
+                                    usernameEl.removeAttribute('readonly');
+                                    usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                            }, 10);
+                        }, true);
+                        
+                        // Continuous check for username field - very frequent
+                        let checkCount = 0;
+                        const usernameCheckInterval = setInterval(function() {
+                            if (modal.classList.contains('show') && window.getComputedStyle(modal).display !== 'none') {
+                                checkCount++;
+                                const wasDisabled = usernameEl.disabled;
+                                const wasReadOnly = usernameEl.readOnly;
+                                const hasDisabledAttr = usernameEl.hasAttribute('disabled');
+                                const hasReadonlyAttr = usernameEl.hasAttribute('readonly');
+                                
+                                if (wasDisabled || wasReadOnly || hasDisabledAttr || hasReadonlyAttr) {
+                                    usernameEl.disabled = false;
+                                    usernameEl.readOnly = false;
+                                    usernameEl.removeAttribute('disabled');
+                                    usernameEl.removeAttribute('readonly');
+                                    usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                                
+                                // Also check CSS properties that might make it appear disabled
+                                const computedStyle = window.getComputedStyle(usernameEl);
+                                const pe = computedStyle.pointerEvents;
+                                const opacity = computedStyle.opacity;
+                                const cursor = computedStyle.cursor;
+                                const display = computedStyle.display;
+                                const visibility = computedStyle.visibility;
+                                
+                                // Check if parent elements are blocking
+                                let parent = usernameEl.parentElement;
+                                let parentBlocking = false;
+                                while (parent && parent !== modal) {
+                                    const parentPE = window.getComputedStyle(parent).pointerEvents;
+                                    if (parentPE === 'none') {
+                                        parentBlocking = true;
+                                        parent.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                    parent = parent.parentElement;
+                                }
+                                
+                                // Fix any CSS issues
+                                if (pe === 'none' || opacity === '0' || display === 'none' || visibility === 'hidden') {
+                                    usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    usernameEl.style.setProperty('opacity', '1', 'important');
+                                    usernameEl.style.setProperty('display', 'block', 'important');
+                                    usernameEl.style.setProperty('visibility', 'visible', 'important');
+                                    usernameEl.style.setProperty('cursor', 'text', 'important');
+                                }
+                                
+                                // Log every 500th check to reduce console spam (was every 20th)
+                                if (checkCount % 500 === 0) {
+                                }
+                            } else {
+                                clearInterval(usernameCheckInterval);
+                            }
+                        }, 10); // Check every 10ms - very frequent
+                    }
+                    
+                    if (passwordEl) {
+                        
+                        // Override the disabled property setter - same as username field
+                        try {
+                            // Store original descriptor
+                            const originalPasswordDescriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'disabled');
+                            
+                            // Override on the specific element
+                            Object.defineProperty(passwordEl, 'disabled', {
+                                get: function() { 
+                                    // Always return false
+                                    return false; 
+                                },
+                                set: function(value) {
+                                    // Only log if trying to disable (value is true)
+                                    if (value === true) {
+                                    }
+                                    // Never allow it to be disabled - always set to false
+                                    if (originalPasswordDescriptor && originalPasswordDescriptor.set) {
+                                        originalPasswordDescriptor.set.call(this, false);
+                                    } else {
+                                        // Fallback: remove attribute
+                                        this.removeAttribute('disabled');
+                                    }
+                                },
+                                configurable: true,
+                                enumerable: true
+                            });
+                            
+                            // Also override readonly
+                            const originalPasswordReadonly = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'readOnly');
+                            Object.defineProperty(passwordEl, 'readOnly', {
+                                get: function() { return false; },
+                                set: function(value) {
+                                    // Only log if trying to set readOnly (value is true)
+                                    if (value === true) {
+                                    }
+                                    if (originalPasswordReadonly && originalPasswordReadonly.set) {
+                                        originalPasswordReadonly.set.call(this, false);
+                                    } else {
+                                        this.removeAttribute('readonly');
+                                    }
+                                },
+                                configurable: true,
+                                enumerable: true
+                            });
+                            
+                        } catch(e) {
+                        }
+                        
+                        // Watch for disabled attribute changes
+                        const passwordObserver = new MutationObserver(function(mutations) {
+                            mutations.forEach(function(mutation) {
+                                if (mutation.type === 'attributes' && (mutation.attributeName === 'disabled' || mutation.attributeName === 'readonly')) {
+                                    if (passwordEl.disabled || passwordEl.readOnly) {
+                                        passwordEl.disabled = false;
+                                        passwordEl.readOnly = false;
+                                        passwordEl.removeAttribute('disabled');
+                                        passwordEl.removeAttribute('readonly');
+                                        passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                }
+                            });
+                            
+                            // Also check the actual disabled state
+                            if (passwordEl.disabled || passwordEl.readOnly) {
+                                passwordEl.disabled = false;
+                                passwordEl.readOnly = false;
+                                passwordEl.removeAttribute('disabled');
+                                passwordEl.removeAttribute('readonly');
+                            }
+                        });
+                        passwordObserver.observe(passwordEl, {
+                            attributes: true,
+                            attributeFilter: ['disabled', 'readonly', 'style'],
+                            attributeOldValue: true
+                        });
+                        
+                        // Add event listeners to keep it enabled
+                        passwordEl.addEventListener('blur', function() {
+                            setTimeout(function() {
+                                if (passwordEl.disabled || passwordEl.readOnly) {
+                                    passwordEl.disabled = false;
+                                    passwordEl.readOnly = false;
+                                    passwordEl.removeAttribute('disabled');
+                                    passwordEl.removeAttribute('readonly');
+                                    passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                            }, 10);
+                        }, true);
+                        
+                        passwordEl.addEventListener('focus', function() {
+                            passwordEl.disabled = false;
+                            passwordEl.readOnly = false;
+                            passwordEl.removeAttribute('disabled');
+                            passwordEl.removeAttribute('readonly');
+                            passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                        }, true);
+                        
+                        passwordEl.addEventListener('click', function(e) {
+                            // Don't stop propagation or prevent default - let natural click behavior work
+                            
+                            // Only enable if disabled - don't force focus
+                            if (passwordEl.disabled || passwordEl.readOnly) {
+                                passwordEl.disabled = false;
+                                passwordEl.readOnly = false;
+                                passwordEl.removeAttribute('disabled');
+                                passwordEl.removeAttribute('readonly');
+                                passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                passwordEl.style.setProperty('opacity', '1', 'important');
+                            }
+                        }, false); // Use bubble phase, not capture
+                        
+                        // Also add mousedown handler
+                        passwordEl.addEventListener('mousedown', function(e) {
+                            // Only enable if disabled - don't stop propagation
+                            if (passwordEl.disabled || passwordEl.readOnly) {
+                                passwordEl.disabled = false;
+                                passwordEl.readOnly = false;
+                                passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                            }
+                        }, false); // Use bubble phase
+                        
+                        // Continuous check for password field - same as username
+                        let passwordCheckCount = 0;
+                        const passwordCheckInterval = setInterval(function() {
+                            if (modal.classList.contains('show') && window.getComputedStyle(modal).display !== 'none') {
+                                passwordCheckCount++;
+                                const wasDisabled = passwordEl.disabled;
+                                const wasReadOnly = passwordEl.readOnly;
+                                const hasDisabledAttr = passwordEl.hasAttribute('disabled');
+                                const hasReadonlyAttr = passwordEl.hasAttribute('readonly');
+                                
+                                if (wasDisabled || wasReadOnly || hasDisabledAttr || hasReadonlyAttr) {
+                                    passwordEl.disabled = false;
+                                    passwordEl.readOnly = false;
+                                    passwordEl.removeAttribute('disabled');
+                                    passwordEl.removeAttribute('readonly');
+                                    passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                                
+                                // Also check CSS properties that might make it appear disabled
+                                const computedStyle = window.getComputedStyle(passwordEl);
+                                const pe = computedStyle.pointerEvents;
+                                const opacity = computedStyle.opacity;
+                                
+                                // Fix any CSS issues
+                                if (pe === 'none' || opacity === '0') {
+                                    passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    passwordEl.style.setProperty('opacity', '1', 'important');
+                                    passwordEl.style.setProperty('z-index', '9999', 'important');
+                                }
+                                
+                                // Ensure tabindex allows focus
+                                if (!passwordEl.hasAttribute('tabindex') || passwordEl.getAttribute('tabindex') === '-1') {
+                                    passwordEl.setAttribute('tabindex', '0');
+                                }
+                                
+                                // Log every 500th check to reduce console spam (was every 20th)
+                                if (passwordCheckCount % 500 === 0) {
+                                }
+                            } else {
+                                clearInterval(passwordCheckInterval);
+                            }
+                        }, 10); // Check every 10ms - very frequent
+                    }
+                    
+                    // Show modal using Bootstrap
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        // Remove any existing modal instances
+                        const existingModal = bootstrap.Modal.getInstance(modal);
+                        if (existingModal) {
+                            existingModal.dispose();
+                        }
+                        
+                        const bsModal = new bootstrap.Modal(modal, {
+                            backdrop: true,
+                            keyboard: true,
+                            focus: true
+                        });
+                        
+                        // Ensure modal is interactive after showing
+                        modal.addEventListener('shown.bs.modal', function() {
+                            // Force enable pointer events on everything
+                            modal.style.setProperty('pointer-events', 'auto', 'important');
+                            modal.style.setProperty('z-index', '1055', 'important');
+                            
+                            const dialog = modal.querySelector('.modal-dialog');
+                            if (dialog) {
+                                dialog.style.setProperty('pointer-events', 'auto', 'important');
+                                dialog.style.setProperty('z-index', '1056', 'important');
+                            }
+                            
+                            const content = modal.querySelector('.modal-content');
+                            if (content) {
+                                content.style.setProperty('pointer-events', 'auto', 'important');
+                                content.style.setProperty('z-index', '1057', 'important');
+                            }
+                            
+                            // Force enable all interactive elements
+                            const allElements = modal.querySelectorAll('*');
+                            allElements.forEach(function(el) {
+                                el.style.setProperty('pointer-events', 'auto', 'important');
+                                if (el.disabled && (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
+                                    // Don't re-enable if it was intentionally disabled
+                                    const disabledAttr = el.getAttribute('disabled');
+                                    if (!disabledAttr || disabledAttr === 'false') {
+                                        el.disabled = false;
+                                    }
+                                }
+                            });
+                            
+                            // Focus on first input - multiple attempts
+                            function forceFocusUsernameDOM() {
+                                if (usernameEl) {
+                                    // Check if field is covered by another element
+                                    var rect = usernameEl.getBoundingClientRect();
+                                    var centerX = rect.left + rect.width / 2;
+                                    var centerY = rect.top + rect.height / 2;
+                                    var elementAtPoint = document.elementFromPoint(centerX, centerY);
+                                    
+                                    if (elementAtPoint !== usernameEl && !usernameEl.contains(elementAtPoint)) {
+                                        // Try to remove pointer-events from covering element
+                                        if (elementAtPoint) {
+                                            elementAtPoint.style.setProperty('pointer-events', 'none', 'important');
+                                        }
+                                    }
+                                    
+                                    // Force enable
+                                    usernameEl.disabled = false;
+                                    usernameEl.readOnly = false;
+                                    usernameEl.removeAttribute('disabled');
+                                    usernameEl.removeAttribute('readonly');
+                                    usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    usernameEl.style.setProperty('cursor', 'text', 'important');
+                                    usernameEl.style.setProperty('opacity', '1', 'important');
+                                    usernameEl.style.setProperty('z-index', '9999', 'important');
+                                    usernameEl.setAttribute('tabindex', '0');
+                                    
+                                    // Only try to focus if no field is currently focused (initial focus only)
+                                    if (!document.activeElement || document.activeElement === document.body) {
+                                        try {
+                                            usernameEl.focus();
+                                        } catch(e) {
+                                        }
+                                    } else {
+                                    }
+                                }
+                                if (passwordEl) {
+                                    passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    passwordEl.style.setProperty('cursor', 'text', 'important');
+                                }
+                            }
+                            
+                            // Only try to focus once initially - don't keep forcing it
+                            setTimeout(forceFocusUsernameDOM, 100);
+                            
+                            // Test if field can receive input programmatically
+                            setTimeout(function() {
+                                if (usernameEl) {
+                                    try {
+                                        // Try to set value programmatically
+                                        usernameEl.value = 'test';
+                                        var event = new Event('input', { bubbles: true });
+                                        usernameEl.dispatchEvent(event);
+                                        
+                                        // Check if value was set
+                                        setTimeout(function() {
+                                            if (usernameEl.value === 'test') {
+                                                usernameEl.value = ''; // Clear test value
+                                            } else {
+                                            }
+                                        }, 10);
+                                    } catch(e) {
+                                    }
+                                }
+                            }, 1000);
+                        }, { once: true });
+                        
+                        bsModal.show();
+                        
+                        // Use MutationObserver to watch for any style changes and override them
+                        const styleObserver = new MutationObserver(function(mutations) {
+                            mutations.forEach(function(mutation) {
+                                if (mutation.type === 'attributes' && (mutation.attributeName === 'style' || mutation.attributeName === 'class')) {
+                                    const target = mutation.target;
+                                    if (target === modal || modal.contains(target)) {
+                                        // Check computed style, not just inline style
+                                        const currentPE = window.getComputedStyle(target).pointerEvents;
+                                        if (currentPE === 'none') {
+                                            target.style.setProperty('pointer-events', 'auto', 'important');
+                                        }
+                                        
+                                        // Also check if modal itself lost pointer-events
+                                        if (target === modal) {
+                                            const modalPE = window.getComputedStyle(modal).pointerEvents;
+                                            if (modalPE === 'none') {
+                                                modal.style.setProperty('pointer-events', 'auto', 'important');
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                            
+                            // Also do a full check of all elements in modal
+                            const allElements = modal.querySelectorAll('*');
+                            allElements.forEach(function(el) {
+                                const pe = window.getComputedStyle(el).pointerEvents;
+                                if (pe === 'none' && (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.tagName === 'LABEL' || el.tagName === 'A')) {
+                                    el.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                            });
+                        });
+                        
+                        // Observe the modal and all its children for style changes
+                        styleObserver.observe(modal, {
+                            attributes: true,
+                            attributeFilter: ['style', 'class'],
+                            subtree: true,
+                            childList: true,
+                            attributeOldValue: true
+                        });
+                        
+                        // Also add click/focus event listeners to prevent disabling
+                        modal.addEventListener('click', function(e) {
+                            // Force enable after any click
+                            setTimeout(function() {
+                                const clickedEl = e.target;
+                                if (clickedEl) {
+                                    clickedEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                                // Also check all form elements
+                                const formEls = modal.querySelectorAll('input, button, textarea, select, label, a');
+                                formEls.forEach(function(el) {
+                                    const pe = window.getComputedStyle(el).pointerEvents;
+                                    if (pe === 'none') {
+                                        el.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                });
+                            }, 10);
+                        }, true); // Use capture phase
+                        
+                        modal.addEventListener('focus', function(e) {
+                            // Force enable on focus
+                            const focusedEl = e.target;
+                            if (focusedEl) {
+                                focusedEl.style.setProperty('pointer-events', 'auto', 'important');
+                            }
+                        }, true);
+                        
+                        modal.addEventListener('mousedown', function(e) {
+                            // Force enable on mousedown (before click)
+                            const target = e.target;
+                            if (target) {
+                                target.style.setProperty('pointer-events', 'auto', 'important');
+                            }
+                            // Also specifically check and fix username field
+                            if (usernameEl && (usernameEl.disabled || usernameEl.readOnly)) {
+                                usernameEl.disabled = false;
+                                usernameEl.readOnly = false;
+                                usernameEl.removeAttribute('disabled');
+                                usernameEl.removeAttribute('readonly');
+                                usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                            }
+                        }, true);
+                        
+                        // Add a specific click handler that always fixes username field
+                        modal.addEventListener('click', function(e) {
+                            // Always check and fix username field after any click in modal
+                            setTimeout(function() {
+                                if (usernameEl) {
+                                    if (usernameEl.disabled || usernameEl.readOnly) {
+                                        usernameEl.disabled = false;
+                                        usernameEl.readOnly = false;
+                                        usernameEl.removeAttribute('disabled');
+                                        usernameEl.removeAttribute('readonly');
+                                        usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                }
+                            }, 5);
+                        }, true);
+                        
+                        // Function to force enable all elements
+                        const forceEnableModal = function() {
+                            // CRITICAL: Disable pointer-events on backdrop so clicks pass through
+                            const backdrop = document.querySelector('.modal-backdrop');
+                            if (backdrop) {
+                                backdrop.style.setProperty('pointer-events', 'none', 'important');
+                                // Only log once per modal show, not on every call
+                                if (!backdrop._pointerEventsDisabled) {
+                                    backdrop._pointerEventsDisabled = true;
+                                }
+                            }
+                            
+                            modal.style.setProperty('pointer-events', 'auto', 'important');
+                            modal.style.setProperty('z-index', '1055', 'important');
+                            modal.classList.add('show');
+                            
+                            // Specifically fix username and password fields first
+                            if (usernameEl) {
+                                if (usernameEl.disabled || usernameEl.readOnly) {
+                                    usernameEl.disabled = false;
+                                    usernameEl.readOnly = false;
+                                    usernameEl.removeAttribute('disabled');
+                                    usernameEl.removeAttribute('readonly');
+                                    usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                            }
+                            if (passwordEl) {
+                                if (passwordEl.disabled || passwordEl.readOnly) {
+                                    passwordEl.disabled = false;
+                                    passwordEl.readOnly = false;
+                                    passwordEl.removeAttribute('disabled');
+                                    passwordEl.removeAttribute('readonly');
+                                    passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                }
+                            }
+                            
+                            const allElements = modal.querySelectorAll('*');
+                            allElements.forEach(function(el) {
+                                el.style.setProperty('pointer-events', 'auto', 'important');
+                                if (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'TEXTAREA') {
+                                    if (el.disabled && el.getAttribute('disabled') !== 'true') {
+                                        el.disabled = false;
+                                    }
+                                    el.style.setProperty('cursor', el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ? 'text' : 'pointer', 'important');
+                                }
+                            });
+                            
+                            const dialog = modal.querySelector('.modal-dialog');
+                            if (dialog) {
+                                dialog.style.setProperty('pointer-events', 'auto', 'important');
+                                dialog.style.setProperty('z-index', '1056', 'important');
+                            }
+                            
+                            const content = modal.querySelector('.modal-content');
+                            if (content) {
+                                content.style.setProperty('pointer-events', 'auto', 'important');
+                                content.style.setProperty('z-index', '1057', 'important');
+                            }
+                        };
+                        
+                        // Force enable immediately and repeatedly
+                        forceEnableModal();
+                        
+                        setTimeout(function() {
+                            forceEnableModal();
+                        }, 50);
+                        
+                        setTimeout(function() {
+                            forceEnableModal();
+                        }, 100);
+                        
+                        setTimeout(function() {
+                            forceEnableModal();
+                        }, 200);
+                        
+                        setTimeout(function() {
+                            forceEnableModal();
+                        }, 500);
+                        
+                        // Keep forcing every 100ms as long as modal is visible (but don't log on every call)
+                        const forceInterval = setInterval(function() {
+                            if (modal.classList.contains('show') && window.getComputedStyle(modal).display !== 'none') {
+                                // Call forceEnableModal but suppress logging
+                                const backdrop = document.querySelector('.modal-backdrop');
+                                if (backdrop) {
+                                    backdrop.style.setProperty('pointer-events', 'none', 'important');
+                                    // Don't log on interval calls
+                                }
+                                modal.style.setProperty('pointer-events', 'auto', 'important');
+                                
+                                // Specifically ensure inputs are never disabled
+                                if (usernameEl) {
+                                    if (usernameEl.disabled || usernameEl.readOnly) {
+                                        usernameEl.disabled = false;
+                                        usernameEl.readOnly = false;
+                                        usernameEl.removeAttribute('disabled');
+                                        usernameEl.removeAttribute('readonly');
+                                        usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                }
+                                if (passwordEl) {
+                                    if (passwordEl.disabled || passwordEl.readOnly) {
+                                        passwordEl.disabled = false;
+                                        passwordEl.readOnly = false;
+                                        passwordEl.removeAttribute('disabled');
+                                        passwordEl.removeAttribute('readonly');
+                                        passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                }
+                            } else {
+                                clearInterval(forceInterval);
+                                if (typeof inputCheckInterval !== 'undefined') {
+                                    clearInterval(inputCheckInterval);
+                                }
+                                styleObserver.disconnect();
+                            }
+                        }, 100);
+                        
+                        // Also add a more frequent check specifically for inputs
+                        const inputCheckInterval = setInterval(function() {
+                            if (modal.classList.contains('show') && window.getComputedStyle(modal).display !== 'none') {
+                                if (usernameEl) {
+                                    if (usernameEl.disabled || usernameEl.readOnly) {
+                                        usernameEl.disabled = false;
+                                        usernameEl.readOnly = false;
+                                        usernameEl.removeAttribute('disabled');
+                                        usernameEl.removeAttribute('readonly');
+                                        usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                    const pe = window.getComputedStyle(usernameEl).pointerEvents;
+                                    if (pe === 'none') {
+                                        usernameEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                }
+                                if (passwordEl) {
+                                    if (passwordEl.disabled || passwordEl.readOnly) {
+                                        passwordEl.disabled = false;
+                                        passwordEl.readOnly = false;
+                                        passwordEl.removeAttribute('disabled');
+                                        passwordEl.removeAttribute('readonly');
+                                        passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                    const pe = window.getComputedStyle(passwordEl).pointerEvents;
+                                    if (pe === 'none') {
+                                        passwordEl.style.setProperty('pointer-events', 'auto', 'important');
+                                    }
+                                }
+                            } else {
+                                clearInterval(inputCheckInterval);
+                            }
+                        }, 50);
+                    } else {
+                        // Fallback if Bootstrap not loaded - properly show modal
+                        modal.removeAttribute('aria-hidden');
+                        modal.setAttribute('aria-modal', 'true');
+                        modal.classList.add('show');
+                        modal.style.display = 'block';
+                        modal.style.zIndex = '1055';
+                        
+                        // Create backdrop if it doesn't exist
+                        let backdrop = document.querySelector('.modal-backdrop');
+                        if (!backdrop) {
+                            backdrop = document.createElement('div');
+                            backdrop.className = 'modal-backdrop fade show';
+                            backdrop.style.zIndex = '1050';
+                            document.body.appendChild(backdrop);
+                        }
+                        
+                        // Prevent body scroll
+                        document.body.classList.add('modal-open');
+                        document.body.style.overflow = 'hidden';
+                        document.body.style.paddingRight = '0px';
+                        
+                        // Focus on first input
+                        setTimeout(function() {
+                            if (usernameEl) {
+                                usernameEl.focus();
+                            }
+                        }, 150);
+                    }
+                } else {
+                    alert('Credentials modal not found. Please refresh the page.');
+                    resetCloseButton();
+                }
+            }
+            
+            // Step 2: Submit credentials
+            function submitCredentials() {
+                const username = document.getElementById('itsr-username').value.trim();
+                const password = document.getElementById('itsr-password').value.trim();
+                
+                if (!username || !password) {
+                    const errorDiv = document.getElementById('credentials-error');
+                    errorDiv.textContent = 'Please enter both username and password.';
+                    errorDiv.classList.remove('d-none');
+                    return;
+                }
+                
+                if (!currentSessionId) {
+                    alert('Session expired. Please start over.');
+                    resetCloseButton();
+                    bootstrap.Modal.getInstance(document.getElementById('itsrCredentialsModal')).hide();
+                    return;
+                }
+                
+                // Disable submit button
+                const submitBtn = document.getElementById('submit-credentials-btn');
+                if (!submitBtn) {
+                    console.error('Submit button not found!');
+                    alert('Error: Submit button not found. Please refresh the page.');
+                    return;
+                }
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Logging in...';
+                
+                const errorDiv = document.getElementById('credentials-error');
+                const successDiv = document.getElementById('credentials-success');
+                errorDiv.classList.add('d-none');
+                successDiv.classList.add('d-none');
+                
+                // Call API to submit credentials
+                const csrfToken = getCsrfToken();
+                if (!csrfToken) {
+                    console.error('CSRF token not found!');
+                    errorDiv.textContent = 'Error: CSRF token not found. Please refresh the page.';
+                    errorDiv.classList.remove('d-none');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Submit';
+                    return;
+                }
+                
+                // Validate session_id
+                if (!currentSessionId) {
+                    console.error('Session ID not found!', currentSessionId);
+                    errorDiv.textContent = 'Error: Session expired. Please start over by clicking the Close Tickets button again.';
+                    errorDiv.classList.remove('d-none');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Submit';
+                    return;
+                }
+                
+                const requestData = {
+                    session_id: currentSessionId,
+                    username: username,
+                    password: password
+                };
+                
+                fetch('{% url "itsr_close_submit_credentials" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(requestData)
+                })
+                .then(response => {
+                    return response.json().then(data => {
+                        // Check if response was ok
+                        if (!response.ok) {
+                            // Include error message from server if available
+                            const errorMsg = data.error || data.message || 'HTTP error! status: ' + response.status;
+                            throw new Error(errorMsg);
+                        }
+                        return data;
+                    });
+                })
+                .then(data => {
+                    if (data.success) {
+                        const needsSms = (data.needs_sms !== false);
+                        successDiv.textContent = data.message || (needsSms
+                            ? 'Login successful! Please check your phone for SMS code.'
+                            : 'Login successful! No SMS verification required.');
+                        successDiv.classList.remove('d-none');
+
+                        // Close credentials modal and proceed
+                        setTimeout(() => {
+                            const modal = document.getElementById('itsrCredentialsModal');
+                            if (modal) {
+                                const bsModal = bootstrap.Modal.getInstance(modal);
+                                if (bsModal) {
+                                    bsModal.hide();
+                                }
+                            }
+
+                            if (needsSms) {
+                                showSmsModal({ needSms: true });
+                                return;
+                            }
+
+                            // No SMS required: backend may already include results
+                            showSmsModal({ needSms: false });
+
+                            const smsErrorDiv = document.getElementById('sms-error');
+                            const smsSuccessDiv = document.getElementById('sms-success');
+                            const smsResultsDiv = document.getElementById('sms-results');
+
+                            if (data.error && smsErrorDiv) {
+                                const errorText = smsErrorDiv.querySelector('#sms-error-text') || smsErrorDiv;
+                                const errorMsg = data.error;
+                                // Check if it's a failure case
+                                if (data.fail_count > 0 || !data.success) {
+                                    let displayError = '<strong>Close ITSR Failed!</strong><br>' + errorMsg;
+                                    if (data.results && data.results.length > 0) {
+                                        const failedTickets = data.results.filter(r => !r.success);
+                                        if (failedTickets.length > 0) {
+                                            displayError += '<br><br><strong>Failed Tickets:</strong><ul class="mb-0 mt-2">';
+                                            failedTickets.forEach(t => {
+                                                displayError += `<li>${t.ticket_number}: ${t.message || 'Unknown error'}</li>`;
+                                            });
+                                            displayError += '</ul>';
+                                        }
+                                    }
+                                    errorText.innerHTML = displayError;
+                                } else {
+                                    errorText.textContent = 'Error: ' + errorMsg;
+                                }
+                                smsErrorDiv.classList.remove('d-none');
+                            } else if (smsSuccessDiv) {
+                                const total = data.total ?? (data.results ? data.results.length : 0);
+                                const ok = data.success_count ?? 0;
+                                const fail = data.fail_count ?? 0;
+                                
+                                if (fail > 0) {
+                                    // Partial success - show warning
+                                    smsSuccessDiv.className = 'alert alert-warning';
+                                    smsSuccessDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i><strong>Partial Success:</strong> Successfully closed ${ok} out of ${total} ticket(s). ${fail} ticket(s) failed.`;
+                                } else {
+                                    smsSuccessDiv.className = 'alert alert-success';
+                                    smsSuccessDiv.innerHTML = `<i class="fas fa-check-circle me-2"></i><strong>Success!</strong> Successfully closed ${ok} out of ${total} ticket(s).`;
+                                }
+                                smsSuccessDiv.classList.remove('d-none');
+                            }
+
+                            if (smsResultsDiv) {
+                                smsResultsDiv.classList.remove('d-none');
+                            }
+                            if (typeof displayCloseResults === 'function') {
+                                displayCloseResults(data);
+                            }
+
+                            // Remove closed tickets from the current search results immediately
+                            const closedTicketNumbers = (data.results || [])
+                                .filter(r => r && r.success)
+                                .map(r => r.ticket_number)
+                                .filter(Boolean);
+
+                            if (closedTicketNumbers.length > 0) {
+                                removeTicketsFromResults(closedTicketNumbers);
+                                updateResultsCount();
+                                if (typeof window.updateCloseButtonState === 'function') {
+                                    window.updateCloseButtonState();
+                                }
+                                if (typeof updateSelectAllState === 'function') {
+                                    updateSelectAllState();
+                                }
+                            }
+
+                            // Reset state so user can continue without reload
+                            resetCloseButton();
+                        }, 1500);
+                    } else {
+                        const errorMsg = data.error || data.message || 'Login failed';
+                        errorDiv.textContent = 'Error: ' + errorMsg;
+                        errorDiv.classList.remove('d-none');
+                        console.error('Login failed:', errorMsg, data);
+                        submitBtn.disabled = false;
+                        submitBtn.removeAttribute('disabled');
+                        submitBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Submit';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error submitting credentials:', error);
+                    errorDiv.textContent = 'Error: ' + (error.message || 'Failed to submit credentials. Please try again.');
+                    errorDiv.classList.remove('d-none');
+                    submitBtn.disabled = false;
+                    submitBtn.removeAttribute('disabled');
+                    submitBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Submit';
+                });
+            }
+            
+            // Step 3: Show SMS modal
+            function showSmsModal(options) {
+                const opts = options || {};
+                const needSms = (opts.needSms !== false);
+                const modal = document.getElementById('itsrSmsModal');
+                if (modal) {
+                    const titleEl = document.getElementById('itsrSmsModalLabel');
+                    const infoEl = modal.querySelector('.alert.alert-info');
+                    const inputGroup = document.getElementById('sms-input-group');
+                    const submitBtn = document.getElementById('submit-sms-btn');
+                    const cancelBtn = document.getElementById('sms-cancel-btn');
+                    const smsInput = document.getElementById('itsr-sms-code');
+                    
+                    // Reset input styling
+                    if (smsInput) {
+                        smsInput.value = '';
+                        smsInput.style.borderColor = '#0d6efd';
+                        smsInput.style.boxShadow = '0 0 15px rgba(13, 110, 253, 0.3)';
+                    }
+
+                    if (titleEl) {
+                        titleEl.innerHTML = needSms
+                            ? '<i class="fas fa-sms me-2"></i>SMS Verification Code'
+                            : '<i class="fas fa-clipboard-check me-2"></i>Close Results';
+                    }
+                    if (infoEl) {
+                        infoEl.innerHTML = needSms
+                            ? '<i class="fas fa-info-circle me-2"></i><strong>Step 3 of 3:</strong> Enter the 6-digit SMS verification code you received on your phone.'
+                            : '<i class="fas fa-info-circle me-2"></i><strong>Closing:</strong> No SMS verification required. Results are shown below.';
+                    }
+                    if (inputGroup) {
+                        inputGroup.classList.toggle('d-none', !needSms);
+                    }
+                    if (submitBtn) {
+                        submitBtn.classList.toggle('d-none', !needSms);
+                        // When showing SMS step, reset submit button state
+                        if (needSms) {
+                            submitBtn.classList.remove('d-none');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Submit';
+                        }
+                    }
+                    if (cancelBtn) {
+                        cancelBtn.textContent = needSms ? 'Cancel' : 'OK';
+                    }
+
+                    // Reset form
+                    const smsCodeEl = document.getElementById('itsr-sms-code');
+                    if (smsCodeEl) {
+                        smsCodeEl.value = '';
+                        // Reset styling
+                        smsCodeEl.style.borderColor = '#0d6efd';
+                        smsCodeEl.style.boxShadow = '0 0 15px rgba(13, 110, 253, 0.3)';
+                    }
+                    
+                    const errorDiv = document.getElementById('sms-error');
+                    const successDiv = document.getElementById('sms-success');
+                    const resultsDiv = document.getElementById('sms-results');
+                    if (errorDiv) errorDiv.classList.add('d-none');
+                    if (successDiv) successDiv.classList.add('d-none');
+                    if (resultsDiv) resultsDiv.classList.add('d-none');
+                    
+                    // Show modal using Bootstrap
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const bsModal = new bootstrap.Modal(modal, {
+                            backdrop: true,
+                            keyboard: true,
+                            focus: true
+                        });
+                        bsModal.show();
+                        
+                        // Focus SMS input when modal is shown (if SMS is needed)
+                        if (needSms && smsCodeEl) {
+                            modal.addEventListener('shown.bs.modal', function focusSmsInput() {
+                                setTimeout(() => {
+                                    smsCodeEl.focus();
+                                    // Add a subtle pulse animation
+                                    smsCodeEl.style.transition = 'all 0.3s ease';
+                                    smsCodeEl.style.transform = 'scale(1.02)';
+                                    setTimeout(() => {
+                                        smsCodeEl.style.transform = 'scale(1)';
+                                    }, 300);
+                                }, 300);
+                                modal.removeEventListener('shown.bs.modal', focusSmsInput);
+                            }, { once: true });
+                        }
+                        
+                        // Ensure submit button has event listener attached
+                        const submitBtnEl = document.getElementById('submit-sms-btn');
+                        if (submitBtnEl && typeof submitSmsCode === 'function') {
+                            // Remove any existing onclick
+                            submitBtnEl.removeAttribute('onclick');
+                            // Remove existing listeners and add new one
+                            const newSubmitBtn = submitBtnEl.cloneNode(true);
+                            submitBtnEl.parentNode.replaceChild(newSubmitBtn, submitBtnEl);
+                            newSubmitBtn.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                if (typeof submitSmsCode === 'function') {
+                                    submitSmsCode();
+                                } else if (typeof window.submitSmsCode === 'function') {
+                                    window.submitSmsCode();
+                                }
+                            });
+                        }
+                    } else {
+                        // Fallback if Bootstrap not loaded - properly show modal
+                        modal.removeAttribute('aria-hidden');
+                        modal.setAttribute('aria-modal', 'true');
+                        modal.classList.add('show');
+                        modal.style.display = 'block';
+                        modal.style.zIndex = '1055';
+                        
+                        // Create backdrop if it doesn't exist
+                        let backdrop = document.querySelector('.modal-backdrop');
+                        if (!backdrop) {
+                            backdrop = document.createElement('div');
+                            backdrop.className = 'modal-backdrop fade show';
+                            backdrop.style.zIndex = '1050';
+                            document.body.appendChild(backdrop);
+                        }
+                        
+                        // Prevent body scroll
+                        document.body.classList.add('modal-open');
+                        document.body.style.overflow = 'hidden';
+                        document.body.style.paddingRight = '0px';
+                        
+                        // Focus on first input
+                        setTimeout(function() {
+                            if (needSms && smsCodeEl) {
+                                smsCodeEl.focus();
+                            }
+                        }, 150);
+                    }
+                } else {
+                    alert('SMS modal not found. Please refresh the page.');
+                    resetCloseButton();
+                }
+            }
+            
+            // Step 3: Submit SMS code
+            function submitSmsCode() {
+                // Get button immediately and change to "Submitting" state
+                const submitBtn = document.getElementById('submit-sms-btn');
+                if (submitBtn && !submitBtn.disabled) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+                }
+                
+                const smsCode = document.getElementById('itsr-sms-code').value.trim();
+                
+                if (!smsCode || smsCode.length !== 6) {
+                    // Re-enable button if validation fails
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Submit';
+                    }
+                    const errorDiv = document.getElementById('sms-error');
+                    const errorText = document.getElementById('sms-error-text');
+                    if (errorText) {
+                        errorText.textContent = 'Please enter a valid 6-digit SMS code.';
+                    } else {
+                        errorDiv.textContent = 'Please enter a valid 6-digit SMS code.';
+                    }
+                    errorDiv.classList.remove('d-none');
+                    // Highlight the input field
+                    const smsInput = document.getElementById('itsr-sms-code');
+                    if (smsInput) {
+                        smsInput.style.borderColor = '#dc3545';
+                        smsInput.style.boxShadow = '0 0 15px rgba(220, 53, 69, 0.5)';
+                        setTimeout(() => {
+                            smsInput.style.borderColor = '#0d6efd';
+                            smsInput.style.boxShadow = '0 0 15px rgba(13, 110, 253, 0.3)';
+                        }, 2000);
+                    }
+                    return;
+                }
+                
+                if (!currentSessionId) {
+                    // Re-enable button if session expired
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Submit';
+                    }
+                    alert('Session expired. Please start over.');
+                    resetCloseButton();
+                    bootstrap.Modal.getInstance(document.getElementById('itsrSmsModal')).hide();
+                    return;
+                }
+                
+                // Get elements (submitBtn already obtained above)
+                const smsInput = document.getElementById('itsr-sms-code');
+                const errorDiv = document.getElementById('sms-error');
+                const successDiv = document.getElementById('sms-success');
+                const resultsDiv = document.getElementById('sms-results');
+                const cancelBtn = document.getElementById('sms-cancel-btn');
+                
+                // Hide previous messages
+                errorDiv.classList.add('d-none');
+                successDiv.classList.add('d-none');
+                resultsDiv.classList.add('d-none');
+                
+                // Show submitting state
+                const submittingDiv = document.createElement('div');
+                submittingDiv.id = 'sms-submitting';
+                submittingDiv.className = 'alert alert-info d-flex align-items-center';
+                submittingDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-3" role="status" aria-hidden="true"></span><strong>Submitting SMS code and closing tickets... Please wait.</strong>';
+                const smsForm = document.getElementById('smsForm');
+                if (smsForm && !document.getElementById('sms-submitting')) {
+                    smsForm.insertBefore(submittingDiv, smsForm.firstChild);
+                }
+                
+                // Disable input and button during submission
+                if (smsInput) {
+                    smsInput.disabled = true;
+                    smsInput.style.opacity = '0.6';
+                    smsInput.style.cursor = 'not-allowed';
+                }
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
+                if (cancelBtn) {
+                    cancelBtn.disabled = true;
+                }
+                
+                // Call API to submit SMS code
+                fetch('{% url "itsr_close_submit_sms" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        session_id: currentSessionId,
+                        sms_code: smsCode
+                    })
+                })
+                .then(response => {
+                    // Check if response is ok
+                    if (!response.ok) {
+                        return response.json().then(errData => {
+                            throw new Error(errData.error || `HTTP ${response.status}: ${response.statusText}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Remove submitting indicator
+                    const submittingDiv = document.getElementById('sms-submitting');
+                    if (submittingDiv) {
+                        submittingDiv.remove();
+                    }
+                    
+                    const smsInput = document.getElementById('itsr-sms-code');
+                    const submitBtn = document.getElementById('submit-sms-btn');
+                    const cancelBtn = document.getElementById('sms-cancel-btn');
+                    
+                    // Re-enable input and buttons
+                    if (smsInput) {
+                        smsInput.disabled = false;
+                        smsInput.style.opacity = '1';
+                        smsInput.style.cursor = 'text';
+                    }
+                    if (cancelBtn) {
+                        cancelBtn.disabled = false;
+                    }
+                    
+                    if (data.success) {
+                        // Show results
+                        displayCloseResults(data);
+                        successDiv.textContent = `Successfully closed ${data.success_count} out of ${data.total} ticket(s).`;
+                        successDiv.classList.remove('d-none');
+                        resultsDiv.classList.remove('d-none');
+                        
+                        // Reset input styling on success
+                        if (smsInput) {
+                            smsInput.style.borderColor = '#198754';
+                            smsInput.style.boxShadow = '0 0 15px rgba(25, 135, 84, 0.3)';
+                        }
+
+                        // If all tickets closed successfully, show OK instead of Cancel and hide submit
+                        const cancelBtn = document.getElementById('sms-cancel-btn');
+                        if (cancelBtn) {
+                            cancelBtn.textContent = (data.fail_count === 0) ? 'OK' : 'Close';
+                        }
+                        submitBtn.classList.add('d-none');
+                        
+                        // Remove closed tickets from the current search results immediately
+                        const closedTicketNumbers = (data.results || [])
+                            .filter(r => r && r.success)
+                            .map(r => r.ticket_number)
+                            .filter(Boolean);
+                        
+                        if (closedTicketNumbers.length > 0) {
+                            removeTicketsFromResults(closedTicketNumbers);
+                            updateResultsCount();
+                            // Keep button state in sync after DOM changes
+                            if (typeof window.updateCloseButtonState === 'function') {
+                                window.updateCloseButtonState();
+                            }
+                            if (typeof updateSelectAllState === 'function') {
+                                updateSelectAllState();
+                            }
+                        }
+                        
+                        // Reset state so user can continue without reloading
+                        resetCloseButton();
+                    } else {
+                        // Submission failed - show clear error prompt
+                        const errorMsg = data.error || 'Failed to close tickets';
+                        const errorText = document.getElementById('sms-error-text');
+                        let displayError = '';
+                        
+                        // Detect SMS code related errors
+                        const smsErrorKeywords = ['验证', '验证码', 'SMS', 'sms', 'code', '验证失败', '验证码错误', 'invalid', 'incorrect', 'wrong', '验证码等待超时'];
+                        const isSmsError = smsErrorKeywords.some(keyword => errorMsg.toLowerCase().includes(keyword.toLowerCase()));
+                        
+                        if (isSmsError) {
+                            displayError = '<i class="fas fa-exclamation-triangle me-2"></i><strong>Incorrect SMS Code!</strong><br><br>The SMS verification code you entered is incorrect or has expired. Please check your phone and enter the correct 6-digit code.<br><small class="text-muted">If you continue to have issues, please try starting the process again.</small>';
+                            // Highlight input with red border and shake animation
+                            if (smsInput) {
+                                smsInput.style.borderColor = '#dc3545';
+                                smsInput.style.boxShadow = '0 0 20px rgba(220, 53, 69, 0.6)';
+                                smsInput.value = ''; // Clear the input
+                                // Add shake animation
+                                smsInput.style.animation = 'shake 0.5s';
+                                setTimeout(() => {
+                                    smsInput.style.animation = '';
+                                    smsInput.focus(); // Refocus for retry
+                                }, 500);
+                            }
+                        } else {
+                            // Other errors - show detailed failure message
+                            displayError = '<i class="fas fa-times-circle me-2"></i><strong>Close ITSR Failed!</strong><br><br>' + errorMsg;
+                            if (data.results && data.results.length > 0) {
+                                const failedTickets = data.results.filter(r => !r.success);
+                                if (failedTickets.length > 0) {
+                                    displayError += '<br><br><strong>Failed Tickets:</strong><ul class="mb-0 mt-2">';
+                                    failedTickets.forEach(t => {
+                                        displayError += `<li><strong>${t.ticket_number}</strong>: ${t.message || 'Unknown error'}</li>`;
+                                    });
+                                    displayError += '</ul>';
+                                }
+                            }
+                            displayError += '<br><small class="text-muted">Please check the error details above and try again if needed.</small>';
+                        }
+                        
+                        if (errorText) {
+                            errorText.innerHTML = displayError;
+                        } else {
+                            errorDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>' + displayError;
+                        }
+                        errorDiv.classList.remove('d-none');
+                        
+                        // Scroll error into view
+                        errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        
+                        // Re-enable submit button
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Submit';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error submitting SMS code:', error);
+                    
+                    // Remove submitting indicator
+                    const submittingDiv = document.getElementById('sms-submitting');
+                    if (submittingDiv) {
+                        submittingDiv.remove();
+                    }
+                    
+                    // Re-enable input and buttons
+                    const smsInput = document.getElementById('itsr-sms-code');
+                    const submitBtn = document.getElementById('submit-sms-btn');
+                    const cancelBtn = document.getElementById('sms-cancel-btn');
+                    
+                    if (smsInput) {
+                        smsInput.disabled = false;
+                        smsInput.style.opacity = '1';
+                        smsInput.style.cursor = 'text';
+                    }
+                    if (cancelBtn) {
+                        cancelBtn.disabled = false;
+                    }
+                    
+                    // Show error prompt
+                    const errorText = document.getElementById('sms-error-text');
+                    const displayError = '<i class="fas fa-wifi me-2"></i><strong>Network Error!</strong><br><br>Failed to submit SMS code. Please check your internet connection and try again.<br><small class="text-muted">Error: ' + (error.message || 'Unknown error') + '</small>';
+                    if (errorText) {
+                        errorText.innerHTML = displayError;
+                    } else {
+                        errorDiv.innerHTML = displayError;
+                    }
+                    errorDiv.classList.remove('d-none');
+                    
+                    // Scroll error into view
+                    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Submit';
+                });
+            }
+            
+            // Display close results
+            function displayCloseResults(data) {
+                const resultsList = document.getElementById('sms-results-list');
+                resultsList.innerHTML = '';
+                
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(result => {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        const icon = result.success ? 'fa-check-circle text-success' : 'fa-times-circle text-danger';
+                        const requestor = result.requestor ? String(result.requestor) : '';
+                        const reqHtml = requestor ? ` <span class="text-muted">(${requestor})</span>` : '';
+                        li.innerHTML = `<i class="fas ${icon} me-2"></i><strong>${result.ticket_number}</strong>${reqHtml}: ${result.message}`;
+                        resultsList.appendChild(li);
+                    });
+                }
+            }
+
+            function removeTicketsFromResults(ticketNumbers) {
+                const set = new Set(ticketNumbers || []);
+                document.querySelectorAll('.results-table-row[data-ticket-number]').forEach(row => {
+                    const num = row.getAttribute('data-ticket-number');
+                    if (num && set.has(num)) {
+                        row.remove();
+                    }
+                });
+            }
+            
+            function updateResultsCount() {
+                const title = document.getElementById('search-results-title');
+                if (!title) return;
+                const rows = document.querySelectorAll('.results-table .results-table-row');
+                title.innerHTML = `<i class="fas fa-list me-2"></i>Search Results (${rows.length})`;
+            }
+
+            function setItsrStatusInDb(ticketId, ticketNumber, newStatus) {
+                return fetch('{% url "itsr_close_update_itsr_status" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        ticket_id: ticketId,
+                        ticket_number: ticketNumber,
+                        itsr_status: newStatus
+                    })
+                }).then(r => r.json());
+            }
+
+            function applyItsrStatusSelectStyle(selectEl) {
+                if (!selectEl) return;
+                selectEl.classList.remove('status-open', 'status-closed');
+                const val = (selectEl.value || '').toLowerCase();
+                if (val === 'open') selectEl.classList.add('status-open');
+                if (val === 'closed') selectEl.classList.add('status-closed');
+            }
+
+            // Apply styling on initial render (Close-ITSR mode)
+            document.querySelectorAll('.itsr-status-select').forEach(applyItsrStatusSelectStyle);
+
+            // Per-row ITSR Status dropdown behavior (Close-ITSR mode)
+            document.addEventListener('change', function(e) {
+                const select = e.target;
+                if (!select || !select.classList || !select.classList.contains('itsr-status-select')) return;
+
+                const newStatus = (select.value || '').toLowerCase();
+                const ticketId = select.getAttribute('data-ticket-id');
+                const ticketNumber = select.getAttribute('data-ticket-number');
+                const row = select.closest('.results-table-row');
+
+                // Update prominence immediately on selection
+                applyItsrStatusSelectStyle(select);
+
+                // Disable while saving
+                const previousDisabled = select.disabled;
+                select.disabled = true;
+
+                setItsrStatusInDb(ticketId, ticketNumber, newStatus)
+                    .then(data => {
+                        if (!data || !data.success) {
+                            alert('Failed to update ITSR Status: ' + (data?.error || 'Unknown error'));
+                            // revert UI to Open on failure (Close-ITSR list is "Open" list)
+                            select.value = 'open';
+                            applyItsrStatusSelectStyle(select);
+                            return;
+                        }
+
+                        if (newStatus === 'closed' && row) {
+                            row.remove();
+                            updateResultsCount();
+                            if (typeof window.updateCloseButtonState === 'function') {
+                                window.updateCloseButtonState();
+                            }
+                            if (typeof updateSelectAllState === 'function') {
+                                updateSelectAllState();
+                            }
                         }
                     })
-                    .catch(error => {
-                        console.error('Error checking auth:', error);
-                        alert('Error checking authentication. Please try again.');
+                    .catch(err => {
+                        console.error('Error updating ITSR Status:', err);
+                        alert('Error updating ITSR Status. Please try again.');
+                        select.value = 'open';
+                        applyItsrStatusSelectStyle(select);
+                    })
+                    .finally(() => {
+                        select.disabled = previousDisabled;
                     });
-            }
+            });
             
-            // Handle close tickets button click
-            if (closeTicketsBtn && closeTicketsForm) {
-                console.log('Attaching click handler to close tickets button');
-                
-                closeTicketsBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Close tickets button clicked');
-                    checkAuthAndSubmit(e);
-                });
-                
-                // Also attach to form submit as backup
-                closeTicketsForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Form submit intercepted');
-                    checkAuthAndSubmit(e);
-                });
-            } else {
-                console.error('closeTicketsBtn or closeTicketsForm not found!', {
-                    btn: !!closeTicketsBtn,
-                    form: !!closeTicketsForm
-                });
-            }
-            
-            // Initial state - check immediately and also after a short delay
-            console.log('Initializing close button state...');
-            console.log('Found checkboxes:', ticketCheckboxes.length);
-            console.log('Found close button:', !!closeTicketsBtn);
-            
-            updateCloseButton();
-            if (selectAllCheckbox) {
-                updateSelectAllState();
-            }
-            
-            // Also check after a short delay in case checkboxes are rendered later
-            setTimeout(function() {
-                console.log('Delayed update after 500ms...');
-                updateCloseButton();
-                if (selectAllCheckbox) {
-                    updateSelectAllState();
+            // Reset close button
+            function resetCloseButton() {
+                window._itsrCloseWorkflowActive = false;
+                closeTicketsBtn.disabled = false;
+                closeTicketsBtn.innerHTML = '<i class="fas fa-lock me-2"></i>Close Tickets in ITSR';
+                currentSessionId = null;
+                selectedTicketIds = [];
+                selectedTicketNumbers = [];
+                if (typeof window.updateCloseButtonState === 'function') {
+                    window.updateCloseButtonState();
                 }
-            }, 500);
+            }
+            
+            // Click handler is already attached above, but make sure startCloseWorkflow is available
+            
+            // Make functions globally available
+            // Store enhanced version but keep head version as primary
+            window._submitCredentialsEnhanced = submitCredentials;
+            // Only override if head version doesn't exist
+            if (!window.submitCredentials || typeof window.submitCredentials !== 'function') {
+                window.submitCredentials = submitCredentials;
+            }
+            window.submitSmsCode = submitSmsCode;
+            window.resetCloseButton = resetCloseButton;
+            
+            // Attach event listener to submit button (instead of inline onclick)
+            const submitSmsBtn = document.getElementById('submit-sms-btn');
+            if (submitSmsBtn) {
+                // Remove any existing onclick
+                submitSmsBtn.removeAttribute('onclick');
+                // Add event listener
+                submitSmsBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    submitSmsCode();
+                });
+            }
+            // Store enhanced version and use it, but keep head version as fallback
+            window._showSmsModalEnhanced = showSmsModal;
+            const originalShowSmsModal = window.showSmsModal;
+            window.showSmsModal = function() {
+                // Use enhanced version if available
+                if (typeof showSmsModal === 'function') {
+                    return showSmsModal();
+                } else if (originalShowSmsModal) {
+                    return originalShowSmsModal();
+                }
+            };
+            window.showCredentialsModal = showCredentialsModal;
+            // Only override if the head version doesn't exist or if we want to use the enhanced version
+            if (!window.startCloseWorkflow || typeof window.startCloseWorkflow !== 'function') {
+                window.startCloseWorkflow = startCloseWorkflow;
+            } else {
+                // Keep the head version but enhance it with access to local functions
+                var originalStartCloseWorkflow = window.startCloseWorkflow;
+                window.startCloseWorkflow = function() {
+                    // Try the enhanced version first, fall back to head version
+                    if (typeof startCloseWorkflow === 'function') {
+                        startCloseWorkflow();
+                    } else {
+                        originalStartCloseWorkflow();
+                    }
+                };
+            }
+            
+            // Click handler is attached once earlier (avoid duplicates)
         }
+    });
+    </script>
+    
+    <script>
+    // Auto-format SMS code input
+    document.addEventListener('DOMContentLoaded', function() {
+        const smsInput = document.getElementById('itsr-sms-code');
+        if (smsInput) {
+            smsInput.addEventListener('input', function(e) {
+                // Only allow numbers
+                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            });
+        }
+    });
         
         // Add a global function that can be called from console
         window.enableCloseButton = function() {
-            console.log('=== enableCloseButton() called from console ===');
             const btn = document.getElementById('close-tickets-btn');
             const checkboxes = document.querySelectorAll('.ticket-checkbox');
             const checked = Array.from(checkboxes).filter(cb => cb.checked && !cb.disabled);
             
-            console.log('Found', checkboxes.length, 'checkboxes,', checked.length, 'checked');
             
             if (!btn) {
                 console.error('Close button not found!');
@@ -1098,32 +3011,45 @@
                 btn.style.cursor = 'pointer';
                 btn.style.pointerEvents = 'auto';
                 btn.innerHTML = '<i class="fas fa-lock-open me-2"></i>Close Tickets in ITSR';
-                console.log('✓ Button ENABLED');
                 alert('Button enabled! ' + checked.length + ' ticket(s) selected.');
                 return true;
             } else {
-                console.log('No tickets selected');
                 alert('Please select at least one ticket first.');
                 return false;
             }
         };
         
-        console.log('=== Global function enableCloseButton() is available ===');
-        console.log('=== You can run: enableCloseButton() in the console ===');
         
         // Handle file dropdown toggles
         document.querySelectorAll('.files-toggle').forEach(function(toggle) {
             toggle.addEventListener('click', function() {
                 const index = this.getAttribute('data-dropdown-index');
                 const dropdown = document.getElementById('files-dropdown-' + index);
-                dropdown.classList.toggle('active');
+                const isActive = dropdown.classList.toggle('active');
+                // Reset direction each time we open
+                dropdown.classList.remove('dropup');
                 
                 // Close other dropdowns
                 document.querySelectorAll('.files-dropdown').forEach(function(d) {
                     if (d.id !== 'files-dropdown-' + index) {
                         d.classList.remove('active');
+                        d.classList.remove('dropup');
                     }
                 });
+
+                // If opening, decide whether to open upward to avoid being covered/clipped
+                if (isActive) {
+                    const menu = dropdown.querySelector('.files-dropdown-menu');
+                    if (menu) {
+                        const buffer = 12; // px from viewport edge
+                        requestAnimationFrame(function() {
+                            const rect = menu.getBoundingClientRect();
+                            if (rect.bottom > (window.innerHeight - buffer)) {
+                                dropdown.classList.add('dropup');
+                            }
+                        });
+                    }
+                }
             });
         });
         
@@ -1132,157 +3058,103 @@
             if (!event.target.closest('.files-dropdown')) {
                 document.querySelectorAll('.files-dropdown').forEach(function(d) {
                     d.classList.remove('active');
+                    d.classList.remove('dropup');
                 });
             }
         });
-    });
     </script>
     
-    <!-- SMS Authentication Modal -->
-    <div class="modal fade" id="itsrSmsAuthModal" tabindex="-1" aria-labelledby="itsrSmsAuthModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+    <!-- Credentials Modal -->
+    <div class="modal fade" id="itsrCredentialsModal" tabindex="-1" aria-labelledby="itsrCredentialsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="itsrSmsAuthModalLabel">
-                        <i class="fas fa-sms me-2"></i>ITSR Authentication via SMS
+                    <h5 class="modal-title" id="itsrCredentialsModalLabel">
+                        <i class="fas fa-user-lock me-2"></i>ITSR Login
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>Instructions:</strong> Paste the SMS content containing authentication tokens below.
-                        The SMS should include <code>SY_ACCESS_TOKEN</code> and <code>SY_UID</code>.
+                        <strong>Step 2 of 3:</strong> Enter your ITSR username and password to start the closing process.
                     </div>
-                    <form id="smsAuthForm">
+                    <form id="credentialsForm">
                         <div class="mb-3">
-                            <label for="smsContent" class="form-label">SMS Content:</label>
-                            <textarea 
-                                class="form-control" 
-                                id="smsContent" 
-                                rows="8" 
-                                placeholder="Paste SMS content here...&#10;&#10;Example format:&#10;SY_ACCESS_TOKEN: eyJhbGciOiJIUzI1NiIsInR...&#10;SY_UID: 12345&#10;sy-cinfo: C4wfMXAR9mXTBKV1LQuL1w=="
-                                required
-                            ></textarea>
-                            <small class="form-text text-muted">
-                                Supports both key-value format and JSON format.
-                            </small>
+                            <label for="itsr-username" class="form-label">Username:</label>
+                            <input type="text" class="form-control" id="itsr-username" placeholder="Enter ITSR username" required>
                         </div>
-                        <div id="smsAuthError" class="alert alert-danger d-none" role="alert"></div>
-                        <div id="smsAuthSuccess" class="alert alert-success d-none" role="alert"></div>
+                        <div class="mb-3">
+                            <label for="itsr-password" class="form-label">Password:</label>
+                            <input type="password" class="form-control" id="itsr-password" placeholder="Enter ITSR password" required>
+                        </div>
+                        <div id="credentials-error" class="alert alert-danger d-none" role="alert"></div>
+                        <div id="credentials-success" class="alert alert-success d-none" role="alert"></div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="submitSmsAuth">
-                        <i class="fas fa-check me-2"></i>Submit & Authenticate
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="resetCloseButton()">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="submit-credentials-btn" onclick="if(typeof window.submitCredentials === 'function') { window.submitCredentials(); } else { console.error('submitCredentials not available'); alert('Error: Submit function not available. Please refresh the page.'); } return false;">
+                        <i class="fas fa-sign-in-alt me-2"></i>Submit
                     </button>
                 </div>
             </div>
         </div>
     </div>
     
-    <script>
-    // SMS Authentication Handler
-    document.addEventListener('DOMContentLoaded', function() {
-        const smsModal = document.getElementById('itsrSmsAuthModal');
-        const smsForm = document.getElementById('smsAuthForm');
-        const smsContent = document.getElementById('smsContent');
-        const submitBtn = document.getElementById('submitSmsAuth');
-        const errorDiv = document.getElementById('smsAuthError');
-        const successDiv = document.getElementById('smsAuthSuccess');
-        
-        // Clear form when modal is shown
-        smsModal.addEventListener('show.bs.modal', function() {
-            smsContent.value = '';
-            errorDiv.classList.add('d-none');
-            successDiv.classList.add('d-none');
-            submitBtn.disabled = false;
-        });
-        
-        // Handle SMS submission
-        submitBtn.addEventListener('click', function() {
-            const content = smsContent.value.trim();
-            
-            if (!content) {
-                errorDiv.textContent = 'Please paste SMS content.';
-                errorDiv.classList.remove('d-none');
-                return;
-            }
-            
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
-            errorDiv.classList.add('d-none');
-            successDiv.classList.add('d-none');
-            
-            // Get CSRF token
-            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
-                             getCookie('csrftoken');
-            
-            // Submit SMS content
-            fetch('{% url "itsr_auth_sms_callback" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrftoken
-                },
-                body: JSON.stringify({
-                    sms_content: content
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    successDiv.textContent = '✓ Authentication successful! Closing tickets...';
-                    successDiv.classList.remove('d-none');
-                    
-                    // Close modal after short delay
-                    setTimeout(() => {
-                        const modal = bootstrap.Modal.getInstance(smsModal);
-                        if (modal) {
-                            modal.hide();
-                        }
-                        
-                        // Submit the pending form if it exists
-                        if (window.pendingCloseTicketsForm) {
-                            setTimeout(() => {
-                                window.pendingCloseTicketsForm.submit();
-                                window.pendingCloseTicketsForm = null;
-                            }, 300);
-                        }
-                    }, 1000);
-                } else {
-                    errorDiv.textContent = 'Error: ' + (data.message || 'Authentication failed');
-                    errorDiv.classList.remove('d-none');
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Submit & Authenticate';
-                }
-            })
-            .catch(error => {
-                console.error('SMS auth error:', error);
-                errorDiv.textContent = 'Error: ' + error.message;
-                errorDiv.classList.remove('d-none');
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-check me-2"></i>Submit & Authenticate';
-            });
-        });
-        
-        // Helper function to get cookie
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-    });
-    </script>
+    <!-- SMS Code Modal -->
+    <div class="modal fade" id="itsrSmsModal" tabindex="-1" aria-labelledby="itsrSmsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="itsrSmsModalLabel">
+                        <i class="fas fa-sms me-2"></i>SMS Verification Code
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Step 3 of 3:</strong> Enter the 6-digit SMS verification code you received on your phone.
+                    </div>
+                    <form id="smsForm">
+                        <div class="mb-3" id="sms-input-group">
+                            <label for="itsr-sms-code" class="form-label fw-bold fs-5">
+                                <i class="fas fa-key me-2"></i>SMS Verification Code:
+                            </label>
+                            <input type="text" class="form-control text-center fw-bold" id="itsr-sms-code" 
+                                   placeholder="123456" maxlength="6" pattern="[0-9]{6}" 
+                                   style="font-size: 2rem; letter-spacing: 0.8rem; 
+                                          border: 3px solid #0d6efd; 
+                                          border-radius: 10px; 
+                                          padding: 15px; 
+                                          background-color: #f8f9fa;
+                                          box-shadow: 0 0 15px rgba(13, 110, 253, 0.3);
+                                          transition: all 0.3s ease;" 
+                                   required autofocus>
+                            <small class="form-text text-muted mt-2 d-block">
+                                <i class="fas fa-mobile-alt me-1"></i>Enter the 6-digit code from your SMS
+                            </small>
+                        </div>
+                        <div id="sms-error" class="alert alert-danger d-none" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i><span id="sms-error-text"></span>
+                        </div>
+                        <div id="sms-success" class="alert alert-success d-none" role="alert"></div>
+                        <div id="sms-results" class="d-none">
+                            <h6>Close Results:</h6>
+                            <ul id="sms-results-list" class="list-group"></ul>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="sms-cancel-btn" data-bs-dismiss="modal" onclick="resetCloseButton()">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="submit-sms-btn">
+                        <i class="fas fa-check me-2"></i>Submit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     
 {% endblock body %}

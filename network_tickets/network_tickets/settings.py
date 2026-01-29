@@ -16,6 +16,31 @@ import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+def _load_simple_env_file(env_path: Path):
+    """
+    Minimal .env loader (KEY=VALUE, ignores comments).
+    Only sets variables that are not already present in the environment.
+    """
+    try:
+        if not env_path.exists():
+            return
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+    except Exception:
+        # Never hard-fail settings import due to dotenv parsing.
+        return
+
+# Load project-level env file if present (e.g. for REDIS_URL, secrets, etc.)
+# NOTE: `.env` is gitignored in this repo; use `env.conf` instead.
+_load_simple_env_file(BASE_DIR / "env.conf")
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -89,6 +114,32 @@ DATABASES = {
         'PORT': '3306',
     }
 }
+
+# Cache
+# - For multi-worker deployments, use a SHARED cache backend (Redis recommended)
+# - Set `REDIS_URL`, e.g. redis://127.0.0.1:6379/1
+#
+# Django 5 ships with a Redis cache backend, but you still need the `redis` Python
+# package installed on the server for it to work.
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
+
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+            "TIMEOUT": 60 * 60,  # 1 hour default
+        }
+    }
+else:
+    # Development fallback (NOT shared across processes)
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "it_network_locmem",
+            "TIMEOUT": 60 * 60,  # 1 hour default
+        }
+    }
 
 
 # Password validation

@@ -29,6 +29,158 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# Django cache integration (for multi-worker deployments)
+# ============================================================================
+#
+# IMPORTANT:
+# - We do NOT store thread/lock/playwright objects in cache (not serializable).
+# - We store only session state (status/results/error) and coordination flags
+#   (sms_code/cancelled) so that different web workers can participate in the
+#   multi-step flow.
+#
+# Lazy import: Django cache may not be available at module import time
+_django_cache = None
+_HAS_DJANGO_CACHE = None  # None = not checked yet, True/False = checked
+
+_CACHE_PREFIX_STATE = "itsr_close:state:"
+_CACHE_PREFIX_SMS = "itsr_close:sms:"
+_CACHE_PREFIX_CANCEL = "itsr_close:cancel:"
+_CACHE_PREFIX_STARTED = "itsr_close:started:"
+
+# Keep cache entries long enough for multi-step human interaction.
+# (The CloseManager legacy in-memory cleanup used 300s; cache TTL is separate.)
+_CACHE_TTL_SECONDS = 60 * 60  # 1 hour
+
+
+def _cache_key(prefix: str, session_id: str) -> str:
+    return f"{prefix}{session_id}"
+
+
+def _cache_enabled() -> bool:
+    """Lazy check: try to import Django cache if not already done."""
+    global _django_cache, _HAS_DJANGO_CACHE
+    
+    # If already checked, return cached result
+    if _HAS_DJANGO_CACHE is not None:
+        return bool(_HAS_DJANGO_CACHE and _django_cache is not None)
+    
+    # Try to import Django cache (may fail if Django not initialized)
+    try:
+        from django.core.cache import cache as _django_cache  # type: ignore
+        _HAS_DJANGO_CACHE = True
+        return True
+    except Exception as e:
+        logger.debug(f"Cache not available: {e}")
+        _django_cache = None
+        _HAS_DJANGO_CACHE = False
+        return False
+
+
+def _state_to_result_list(results: List[Dict]) -> List["TicketCloseResult"]:
+    out: List[TicketCloseResult] = []
+    for r in results or []:
+        try:
+            out.append(
+                TicketCloseResult(
+                    ticket_number=str(r.get("ticket_number", "")),
+                    success=bool(r.get("success", False)),
+                    message=str(r.get("message", "")),
+                )
+            )
+        except Exception:
+            continue
+    return out
+
+
+def _results_to_state_list(results: List["TicketCloseResult"]) -> List[Dict]:
+    return [
+        {"ticket_number": r.ticket_number, "success": bool(r.success), "message": r.message}
+        for r in (results or [])
+    ]
+
+
+def _cache_get_state(session_id: str) -> Optional[Dict]:
+    if not _cache_enabled():
+        return None
+    try:
+        return _django_cache.get(_cache_key(_CACHE_PREFIX_STATE, session_id))
+    except Exception as e:
+        logger.warning(f"[{session_id}] 读取缓存状态失败: {e}")
+        return None
+
+
+def _cache_set_state(session_id: str, state: Dict, ttl: int = _CACHE_TTL_SECONDS):
+    if not _cache_enabled():
+        return
+    try:
+        _django_cache.set(_cache_key(_CACHE_PREFIX_STATE, session_id), state, timeout=ttl)
+    except Exception as e:
+        logger.warning(f"[{session_id}] 写入缓存状态失败: {e}")
+
+
+def _cache_update_state(session_id: str, **updates):
+    """
+    Update cached state dict with fields in updates.
+    """
+    state = _cache_get_state(session_id) or {}
+    state.update(updates)
+    # Always refresh a heartbeat timestamp and TTL.
+    state["updated_at"] = time.time()
+    _cache_set_state(session_id, state)
+
+
+def _cache_set_sms_code(session_id: str, sms_code: str):
+    if not _cache_enabled():
+        return
+    try:
+        _django_cache.set(_cache_key(_CACHE_PREFIX_SMS, session_id), str(sms_code), timeout=_CACHE_TTL_SECONDS)
+    except Exception as e:
+        logger.warning(f"[{session_id}] 写入验证码缓存失败: {e}")
+
+
+def _cache_get_sms_code(session_id: str) -> str:
+    if not _cache_enabled():
+        return ""
+    try:
+        val = _django_cache.get(_cache_key(_CACHE_PREFIX_SMS, session_id))
+        return str(val).strip() if val else ""
+    except Exception:
+        return ""
+
+
+def _cache_set_cancelled(session_id: str):
+    if not _cache_enabled():
+        return
+    try:
+        _django_cache.set(_cache_key(_CACHE_PREFIX_CANCEL, session_id), True, timeout=_CACHE_TTL_SECONDS)
+    except Exception as e:
+        logger.warning(f"[{session_id}] 写入取消标记失败: {e}")
+
+
+def _cache_is_cancelled(session_id: str) -> bool:
+    if not _cache_enabled():
+        return False
+    try:
+        return bool(_django_cache.get(_cache_key(_CACHE_PREFIX_CANCEL, session_id)))
+    except Exception:
+        return False
+
+
+def _cache_try_mark_started(session_id: str) -> bool:
+    """
+    Returns True only for the first caller that starts processing this session.
+    Uses cache.add() for a best-effort cross-worker lock.
+    """
+    if not _cache_enabled():
+        return True
+    try:
+        # cache.add returns False if key already exists
+        return bool(_django_cache.add(_cache_key(_CACHE_PREFIX_STARTED, session_id), True, timeout=_CACHE_TTL_SECONDS))
+    except Exception:
+        # If cache backend doesn't support add reliably, fall back to allowing start.
+        return True
+
 # 数据库管理器（可选）
 _db_manager = None
 
@@ -64,6 +216,7 @@ class SessionStatus(Enum):
     SUCCESS = "success"              # 成功
     ERROR = "error"                  # 失败
     EXPIRED = "expired"              # 过期
+    NO_SMS_REQUIRED = "no_sms_required"  # 无需验证码，直接登录成功
 
 
 @dataclass
@@ -102,14 +255,21 @@ class CloseSession:
     流程：创建 → 提交凭据 → 提交验证码 → 关单 → 清理
     """
     
-    # 工单关闭 API 配置
-    DETAIL_ENDPOINT = "https://bpm.cmhktry.com/service/serverQuery/data/dataQuery"
-    SUBMIT_ENDPOINT = "https://bpm.cmhktry.com/service/serverQuery/submit"
-    PRECHECK_ENDPOINT = "https://bpm.cmhktry.com/service/bpm/bizBpm/preCheck"
-    APP_NAME = "ITSR"
-    ROOT_ENTITY_NAME = "ITSR"
-    PAGE_URL = "/main/itsr/itsr-Alldetail"
-    PAGE_GUID = "8a64c07e88698302018945e0a5ed0d41"
+    # 工单关闭 API 配置 (使用 BPM 原生 API)
+    BPM_BASE_URL = "https://bpm.cmhktry.com"
+    # 事项列表 API - 根据工单编号搜索获取 caseId/affairId 等信息
+    LIST_ENDPOINT = f"{BPM_BASE_URL}/service/itsr07195287674072066508260/i-tfuwuxuqiuliebiao-user/filter-plan/itsr07195287674072066508260/shixiang/1164050706911494756"
+    # GraphQL API - 获取工单详情和子表数据
+    GRAPHQL_ENDPOINT = f"{BPM_BASE_URL}/service/bpm/graphql"
+    # 关单提交 API
+    SUBMIT_ENDPOINT = f"{BPM_BASE_URL}/service/bpm/operation/submit"
+    
+    # 应用配置
+    APP_NAME = "itsr07195287674072066508260"
+    ROOT_ENTITY_NAME = "com.seeyon.itsr07195287674072066508260.domain.entity.ITfuwuxuqiu"
+    PAGE_URL = "ITfuwuxuqiuxiangqing"
+    PAGE_GUID = "-5702948354103621860"
+    TEMPLATE_ID = "1214511312462186257"
     
     def __init__(self, session_id: str, ticket_numbers: List[str], update_db: bool = True):
         """
@@ -148,8 +308,85 @@ class CloseSession:
         self._username = ""
         self._password = ""
         self._sms_code = ""
+
+        # Persist initial state for web multi-step flow (best-effort)
+        self._persist_state()
+
+    def _persist_state(self):
+        """
+        Best-effort: persist current session state into Django cache so that
+        polling / step transitions work across multiple web workers.
+        """
+        def _debug(msg):
+            try:
+                with open("/tmp/itsr_close_debug.log", "a") as f:
+                    import datetime
+                    f.write(f"{datetime.datetime.now()} {msg}\n")
+                    f.flush()
+            except:
+                pass
+        
+        if not _cache_enabled():
+            _debug(f"[{self.session_id}] _persist_state: cache not enabled!")
+            return
+        try:
+            _debug(f"[{self.session_id}] _persist_state: saving status={self.status.value}")
+            _cache_update_state(
+                self.session_id,
+                ticket_numbers=self.ticket_numbers,
+                update_db=bool(self.update_db),
+                created_at=float(self.created_at),
+                status=self.status.value,
+                error=str(self.error or ""),
+                results=_results_to_state_list(self.results),
+            )
+            # Verify it was written
+            verify = _cache_get_state(self.session_id)
+            if verify:
+                _debug(f"[{self.session_id}] _persist_state: verified status={verify.get('status')}")
+            else:
+                _debug(f"[{self.session_id}] _persist_state: verification FAILED - cache empty!")
+        except Exception as e:
+            _debug(f"[{self.session_id}] persist_state failed: {e}")
+
+    def _set_status(self, status: SessionStatus, error: str = ""):
+        with self._lock:
+            self.status = status
+            if error:
+                self.error = error
+        self._persist_state()
+
+    def _append_result(self, result: "TicketCloseResult"):
+        with self._lock:
+            self.results.append(result)
+        self._persist_state()
+
+    def _wait_for_sms_code(self, timeout: int = 300) -> bool:
+        """
+        Wait for SMS code.
+
+        - In web multi-worker mode: poll Django cache for sms_code written by step 3.
+        - Fallback: use the in-process event (legacy CLI/testing).
+        """
+        # Prefer cache coordination if available.
+        if _cache_enabled():
+            start = time.time()
+            while time.time() - start < timeout:
+                if _cache_is_cancelled(self.session_id):
+                    self._set_status(SessionStatus.EXPIRED, "会话已取消")
+                    return False
+                code = _cache_get_sms_code(self.session_id)
+                if code:
+                    with self._lock:
+                        self._sms_code = code
+                    return True
+                time.sleep(0.5)
+            return False
+
+        # Legacy path
+        return bool(self._sms_event.wait(timeout=timeout))
     
-    def submit_credentials(self, username: str, password: str, timeout: int = 60) -> Tuple[bool, str]:
+    def submit_credentials(self, username: str, password: str, timeout: int = 120) -> Tuple[bool, str]:
         """
         提交账号密码，启动登录流程
         
@@ -159,13 +396,17 @@ class CloseSession:
             timeout: 等待超时（秒）
         
         Returns:
-            (success, error_message)
+            (success, message)
+            - success=True, message="" 表示需要验证码
+            - success=True, message="NO_SMS_REQUIRED" 表示无需验证码，已自动开始关单
+            - success=False, message=错误信息
         """
         with self._lock:
             if self.status != SessionStatus.WAITING_CREDENTIALS:
                 return False, f"状态错误: {self.status.value}"
             self._username = username
             self._password = password
+        self._persist_state()
         
         # 启动登录线程
         self._thread = threading.Thread(target=self._login_and_close_flow, daemon=True)
@@ -174,19 +415,34 @@ class CloseSession:
         # 通知线程开始
         self._credentials_event.set()
         
-        # 等待到达验证码页面
+        # 等待到达验证码页面或直接登录成功
+        import sys
         start_time = time.time()
+        print(f"[{self.session_id}] submit_credentials: waiting for status change, current={self.status.value}", file=sys.stderr, flush=True)
         while time.time() - start_time < timeout:
             with self._lock:
                 if self.status == SessionStatus.WAITING_SMS:
+                    print(f"[{self.session_id}] submit_credentials: detected WAITING_SMS, persisting to cache", file=sys.stderr, flush=True)
+                    # Ensure cache is updated before returning
+                    self._persist_state()
+                    print(f"[{self.session_id}] submit_credentials: returning True for SMS flow", file=sys.stderr, flush=True)
                     return True, ""
+                # 无需验证码：认证完成后状态才会变为 NO_SMS_REQUIRED/CLOSING/SUCCESS
+                if self.status in (SessionStatus.NO_SMS_REQUIRED, SessionStatus.CLOSING, SessionStatus.SUCCESS):
+                    print(f"[{self.session_id}] submit_credentials: detected {self.status.value}, no SMS needed", file=sys.stderr, flush=True)
+                    # Ensure cache is updated before returning
+                    self._persist_state()
+                    return True, "NO_SMS_REQUIRED"
                 if self.status == SessionStatus.ERROR:
+                    print(f"[{self.session_id}] submit_credentials: detected ERROR: {self.error}", file=sys.stderr, flush=True)
+                    self._persist_state()
                     return False, self.error
-            time.sleep(0.5)
+            time.sleep(0.3)
         
         with self._lock:
             self.status = SessionStatus.ERROR
             self.error = "登录超时"
+        self._persist_state()
         return False, "登录超时"
     
     def submit_sms_code(self, sms_code: str, timeout: int = 180) -> CloseSessionResult:
@@ -204,6 +460,7 @@ class CloseSession:
             if self.status != SessionStatus.WAITING_SMS:
                 return CloseSessionResult(error=f"状态错误: {self.status.value}")
             self._sms_code = sms_code
+        self._persist_state()
         
         # 通知线程继续
         self._sms_event.set()
@@ -221,9 +478,18 @@ class CloseSession:
         return CloseSessionResult(error="关单超时")
     
     def cancel(self):
-        """取消会话"""
+        """取消会话（仅用于中途取消，已完成的会话无需调用）"""
+        # 检查是否已经是终态，避免死锁
+        if self.status in (SessionStatus.SUCCESS, SessionStatus.ERROR, SessionStatus.EXPIRED):
+            return
+        
         with self._lock:
+            if self.status in (SessionStatus.SUCCESS, SessionStatus.ERROR, SessionStatus.EXPIRED):
+                return
             self.status = SessionStatus.EXPIRED
+            self.error = "会话已取消"
+        self._persist_state()
+        
         self._credentials_event.set()
         self._sms_event.set()
         self.cleanup()
@@ -256,6 +522,7 @@ class CloseSession:
         self._context = None
         
         logger.info(f"[{self.session_id}] 会话已清理")
+        self._persist_state()
     
     # ========================================================================
     # 私有方法
@@ -271,54 +538,109 @@ class CloseSession:
                 if self.status == SessionStatus.EXPIRED:
                     return
                 self.status = SessionStatus.LOGGING_IN
+            self._persist_state()
             
-            # 执行 Playwright 登录
-            if not self._do_playwright_login():
+            # 执行 Playwright 登录，返回是否需要验证码
+            needs_sms = self._do_playwright_login()
+            if needs_sms is None:
+                # 登录失败
                 return
             
-            # 等待验证码
-            with self._lock:
-                self.status = SessionStatus.WAITING_SMS
-            logger.info(f"[{self.session_id}] 等待验证码...")
-            
-            # 等待验证码（5分钟超时）
-            if not self._sms_event.wait(timeout=300):
+            if needs_sms:
+                # 需要验证码流程
+                def _debug(msg):
+                    try:
+                        with open("/tmp/itsr_close_debug.log", "a") as f:
+                            import datetime
+                            f.write(f"{datetime.datetime.now()} {msg}\n")
+                            f.flush()
+                    except:
+                        pass
+                _debug(f"[{self.session_id}] THREAD: needs_sms=True, setting WAITING_SMS...")
                 with self._lock:
-                    self.status = SessionStatus.EXPIRED
-                    self.error = "验证码等待超时"
-                self.cleanup()
-                return
-            
-            with self._lock:
-                if self.status == SessionStatus.EXPIRED:
+                    self.status = SessionStatus.WAITING_SMS
+                    self.error = ""
+                    # IMPORTANT: persist to cache while holding lock, so the main thread
+                    # sees cache updated before it returns to caller.
+                    self._persist_state()
+                _debug(f"[{self.session_id}] THREAD: WAITING_SMS set and persisted to cache")
+                logger.info(f"[{self.session_id}] 需要验证码，等待输入...")
+                
+                # 等待验证码（5分钟超时）
+                if not self._wait_for_sms_code(timeout=300):
+                    with self._lock:
+                        self.status = SessionStatus.EXPIRED
+                        self.error = "验证码等待超时"
+                    self._persist_state()
+                    self.cleanup()
                     return
-            
-            # 提交验证码并获取认证
-            if not self._do_submit_sms():
-                return
+                
+                with self._lock:
+                    if self.status == SessionStatus.EXPIRED:
+                        return
+                
+                # 提交验证码并获取认证
+                if not self._do_submit_sms():
+                    return
+            else:
+                # 无需验证码流程
+                logger.info(f"[{self.session_id}] 无需验证码，等待认证...")
+                
+                # 等待登录重定向完成并获取认证
+                if not self._wait_for_auth_complete():
+                    return
+                
+                # 认证成功后设置状态
+                with self._lock:
+                    self.status = SessionStatus.NO_SMS_REQUIRED
+                    self.error = ""
+                logger.info(f"[{self.session_id}] ✅ 认证成功（无需验证码）")
+                self._persist_state()
             
             # 执行关单
             with self._lock:
                 self.status = SessionStatus.CLOSING
+                self.error = ""
             logger.info(f"[{self.session_id}] 开始关闭 {len(self.ticket_numbers)} 个工单...")
+            self._persist_state()
             
             self._do_close_tickets()
             
+            # 根据结果设置状态和日志
+            success_count = sum(1 for r in self.results if r.success)
+            fail_count = sum(1 for r in self.results if not r.success)
+            
             with self._lock:
                 self.status = SessionStatus.SUCCESS
-            logger.info(f"[{self.session_id}] ✅ 关单完成")
+                self.error = ""
+            self._persist_state()
+            
+            if fail_count == 0:
+                logger.info(f"[{self.session_id}] ✅ 关单完成，全部成功 ({success_count}个)")
+            elif success_count == 0:
+                logger.warning(f"[{self.session_id}] ❌ 关单完成，全部失败 ({fail_count}个)")
+            else:
+                logger.info(f"[{self.session_id}] ⚠️ 关单完成，成功 {success_count}个，失败 {fail_count}个")
             
         except Exception as e:
             logger.error(f"[{self.session_id}] 流程异常: {e}")
             with self._lock:
                 self.status = SessionStatus.ERROR
                 self.error = str(e)
+            self._persist_state()
         
         finally:
             self.cleanup()
     
-    def _do_playwright_login(self) -> bool:
-        """执行 Playwright 登录（到验证码页面）"""
+    def _do_playwright_login(self) -> Optional[bool]:
+        """
+        执行 Playwright 登录，自动判断是否需要验证码
+        
+        Returns:
+            True: 需要验证码
+            False: 无需验证码，已直接登录成功
+            None: 登录失败
+        """
         try:
             from playwright.sync_api import sync_playwright
             
@@ -341,18 +663,119 @@ class CloseSession:
             self._page.fill('input[name="password"]', self._password)
             self._page.click('button[type="submit"], input[type="submit"]')
             
-            logger.info(f"[{self.session_id}] 等待验证码页面...")
-            self._page.wait_for_load_state('domcontentloaded', timeout=10000)
+            logger.info(f"[{self.session_id}] 等待页面跳转...")
+            self._page.wait_for_load_state('domcontentloaded', timeout=15000)
             
-            return True
+            # 自动判断是否需要验证码
+            needs_sms = self._check_if_sms_required()
+            
+            if needs_sms:
+                logger.info(f"[{self.session_id}] 检测到需要验证码")
+            else:
+                logger.info(f"[{self.session_id}] 检测到无需验证码，已直接登录")
+                # 等待页面完全加载以获取认证信息
+                try:
+                    self._page.wait_for_load_state('networkidle', timeout=15000)
+                except:
+                    self._page.wait_for_timeout(3000)
+            
+            return needs_sms
             
         except Exception as e:
             logger.error(f"[{self.session_id}] Playwright 登录失败: {e}")
             with self._lock:
                 self.status = SessionStatus.ERROR
                 self.error = f"登录失败: {e}"
+            self._persist_state()
             self.cleanup()
+            return None
+    
+    def _check_if_sms_required(self) -> bool:
+        """
+        检查是否需要短信验证码
+        
+        判断逻辑：
+        1. 检查当前 URL 主机名 - 如果已跳转到 BPM，说明不需要验证码
+        2. 检查页面是否存在验证码输入框
+        3. 如果还在 CAS 页面且有验证码输入框，说明需要验证码
+        
+        Returns:
+            True: 需要验证码
+            False: 不需要验证码
+        """
+        try:
+            from urllib.parse import urlparse
+            
+            current_url = self._page.url
+            logger.info(f"[{self.session_id}] 当前URL: {current_url}")
+            
+            # 解析 URL 获取主机名
+            parsed_url = urlparse(current_url)
+            hostname = parsed_url.netloc  # 获取主机名部分
+            logger.info(f"[{self.session_id}] 主机名: {hostname}")
+            
+            # 方法1: 检查 URL 主机名是否是 BPM（不是 CAS）
+            if "bpm.cmhktry.com" in hostname:
+                logger.info(f"[{self.session_id}] 已跳转到BPM站点，无需验证码")
+                return False
+            
+            # 方法2: 检查是否还在 CAS 页面
+            if "ncas.hk.chinamobile.com" in hostname:
+                # 检查页面上是否有验证码输入框
+                sms_indicators = [
+                    '#code_input1',           # 6位验证码输入框
+                    '#sms_token',             # 验证码token
+                    'input[name="token"]',    # token输入框
+                    '.sms-code-input',        # 可能的验证码输入样式
+                    '#sendSmsBtn',            # 发送验证码按钮
+                ]
+                
+                for selector in sms_indicators:
+                    elem = self._page.query_selector(selector)
+                    if elem:
+                        logger.info(f"[{self.session_id}] 检测到验证码元素: {selector}")
+                        return True
+                
+                # 检查页面文本是否包含验证码相关内容
+                page_text = self._page.text_content('body') or ""
+                sms_keywords = ['验证码', '短信验证', 'SMS', 'verification code']
+                for keyword in sms_keywords:
+                    if keyword.lower() in page_text.lower():
+                        logger.info(f"[{self.session_id}] 页面包含验证码关键词: {keyword}")
+                        return True
+                
+                # 还在 CAS 但没有明确的验证码标识，等待一下看是否会跳转
+                logger.info(f"[{self.session_id}] 在CAS页面，等待可能的跳转...")
+                try:
+                    # 等待URL主机名变为BPM（不是作为参数包含）
+                    self._page.wait_for_function(
+                        "() => window.location.hostname.includes('bpm.cmhktry.com')",
+                        timeout=5000
+                    )
+                    logger.info(f"[{self.session_id}] 成功跳转到BPM，无需验证码")
+                    return False
+                except:
+                    # 没有跳转，再次检查验证码元素
+                    for selector in sms_indicators:
+                        elem = self._page.query_selector(selector)
+                        if elem:
+                            return True
+                    # 默认需要验证码（保守策略）
+                    logger.info(f"[{self.session_id}] 无法确定，默认需要验证码")
+                    return True
+            
+            # 其他情况，检查是否有验证码输入框
+            code_input = self._page.query_selector('#code_input1')
+            if code_input:
+                return True
+            
+            # 默认不需要验证码
             return False
+            
+        except Exception as e:
+            logger.warning(f"[{self.session_id}] 检查验证码需求时出错: {e}")
+            # 出错时保守处理，假设需要验证码
+            return True
     
     def _do_submit_sms(self) -> bool:
         """提交验证码并获取认证"""
@@ -409,6 +832,7 @@ class CloseSession:
                 with self._lock:
                     self.status = SessionStatus.ERROR
                     self.error = "未获取到认证信息"
+                self._persist_state()
                 return False
             
             logger.info(f"[{self.session_id}] ✅ 获取认证成功")
@@ -419,6 +843,7 @@ class CloseSession:
             with self._lock:
                 self.status = SessionStatus.ERROR
                 self.error = f"验证失败: {e}"
+            self._persist_state()
             return False
     
     def _extract_auth(self):
@@ -444,6 +869,39 @@ class CloseSession:
             except:
                 pass
     
+    def _wait_for_auth_complete(self) -> bool:
+        """
+        等待认证完成（无需验证码的情况）
+        
+        Returns:
+            True: 认证成功
+            False: 认证失败
+        """
+        try:
+            # 快速轮询检测认证 cookies（最多等待 15 秒）
+            for _ in range(30):
+                self._extract_auth()
+                if self._access_token and self._uid:
+                    logger.info(f"[{self.session_id}] 认证获取成功: uid={self._uid}")
+                    return True
+                self._page.wait_for_timeout(500)
+            
+            # 超时未获取到认证
+            logger.error(f"[{self.session_id}] 认证超时")
+            with self._lock:
+                self.status = SessionStatus.ERROR
+                self.error = "认证超时"
+            self._persist_state()
+            return False
+            
+        except Exception as e:
+            logger.error(f"[{self.session_id}] 认证失败: {e}")
+            with self._lock:
+                self.status = SessionStatus.ERROR
+                self.error = f"认证失败: {e}"
+            self._persist_state()
+            return False
+    
     def _do_close_tickets(self):
         """执行关单"""
         headers = {
@@ -459,7 +917,7 @@ class CloseSession:
         
         for ticket_num in self.ticket_numbers:
             result = self._close_single_ticket(session, ticket_num)
-            self.results.append(result)
+            self._append_result(result)
             
             if result.success:
                 logger.info(f"[{self.session_id}] ✅ {ticket_num} 关闭成功")
@@ -486,119 +944,399 @@ class CloseSession:
     def _close_single_ticket(self, session: requests.Session, ticket_number: str) -> TicketCloseResult:
         """关闭单个工单"""
         try:
-            # 获取详情
+            logger.info(f"[{self.session_id}] 查询工单: {ticket_number}")
+            
+            # 通过事项列表获取工单详情（包含 caseId, affairId 等关键字段）
             detail = self._get_ticket_detail(session, ticket_number)
             if not detail:
-                return TicketCloseResult(ticket_number, False, "获取工单详情失败")
+                return TicketCloseResult(ticket_number, False, "获取工单详情失败（工单不存在或无权限）")
             
-            # 获取子表
-            zibiao = self._get_zibiao(session, detail['id'])
+            logger.info(f"[{self.session_id}] 工单详情: caseId={detail.get('caseId')}, "
+                       f"affairId={detail.get('affairId')}, status={detail.get('yewuzhuangtai')}")
+            
+            # 获取子表数据（处理明细）
+            zibiao = self._get_zibiao(session, detail)
+            logger.info(f"[{self.session_id}] 子表数量: {len(zibiao)}")
             
             # 执行关单
             success, msg = self._do_close(session, detail, zibiao)
             return TicketCloseResult(ticket_number, success, msg)
             
         except Exception as e:
+            logger.error(f"[{self.session_id}] 关单异常: {e}")
             return TicketCloseResult(ticket_number, False, str(e))
     
     def _get_ticket_detail(self, session: requests.Session, ticket_number: str) -> Optional[Dict]:
-        """获取工单详情"""
+        """
+        通过事项列表API查询工单详情
+        
+        返回包含 caseId, affairId, formRecordId, permissionId 等关键字段的字典
+        """
+        # 使用事项列表 API 搜索工单（参考 itsr_auto_close.py）
         payload = {
-            "appName": self.APP_NAME,
-            "pageGuid": self.PAGE_GUID,
-            "rootEntityName": self.ROOT_ENTITY_NAME,
-            "rootWhere": f"number='{ticket_number}'",
-            "dataEntityName": self.ROOT_ENTITY_NAME,
-            "isContainRootEntity": True,
-            "isCustom": True,
-            "pageSize": 20,
-            "pageNum": 1,
-            "lang": "zh-CN"
+            "filterPlanGuids": ["1164050706911494756"],
+            "searchParams": {
+                "searchParam": {
+                    "LIKE_ShixiangDto_iTSRbianhao": ticket_number  # 正确的搜索参数格式
+                },
+                "logicalOperator": "AND",
+                "sortSettings": [],
+                "expressionValues": {},
+                "one2OneEntityRelationsV2": []
+            },
+            "pageInfo": {
+                "pageNumber": 1,
+                "pageSize": 10,
+                "pages": 1,
+                "total": 0,
+                "needTotal": True
+            }
         }
         
-        resp = session.post(self.DETAIL_ENDPOINT, json=payload, timeout=30)
-        data = resp.json()
-        
-        if data.get('status') == 0 and data.get('data', {}).get('list'):
-            return data['data']['list'][0]
-        return None
+        try:
+            resp = session.post(self.LIST_ENDPOINT, json=payload, timeout=30)
+            logger.info(f"[{self.session_id}] 列表API响应: HTTP {resp.status_code}, 长度: {len(resp.text)}")
+            
+            if resp.status_code != 200:
+                logger.error(f"[{self.session_id}] HTTP错误: {resp.status_code}, 响应: {resp.text[:500]}")
+                return None
+            
+            try:
+                data = resp.json()
+                logger.debug(f"[{self.session_id}] 列表API响应内容: {str(data)[:500]}")
+            except Exception as json_err:
+                logger.error(f"[{self.session_id}] JSON解析失败: {json_err}, 响应内容: {resp.text[:500]}")
+                return None
+            
+            if data is None:
+                logger.error(f"[{self.session_id}] API返回空响应")
+                return None
+            
+            api_status = data.get('status')
+            api_message = data.get('message', '')
+            
+            # 安全地获取 content，避免 NoneType 错误
+            data_obj = data.get('data')
+            if data_obj is None:
+                logger.error(f"[{self.session_id}] API响应缺少data字段，完整响应: {str(data)[:500]}")
+                return None
+            
+            content = data_obj.get('content', []) if isinstance(data_obj, dict) else []
+            
+            logger.info(f"[{self.session_id}] 列表查询: status={api_status}, message='{api_message}', 数量={len(content)}")
+            
+            if api_status == 0 and content:
+                # 查找匹配的工单
+                for ticket in content:
+                    if ticket.get('iTSRbianhao') == ticket_number:
+                        logger.info(f"[{self.session_id}] 找到工单: caseId={ticket.get('caseId')}, affairId={ticket.get('affairId')}")
+                        return ticket
+                logger.warning(f"[{self.session_id}] 工单编号不匹配: {ticket_number}")
+            
+            if api_status != 0:
+                logger.warning(f"[{self.session_id}] API错误: {api_message}")
+            else:
+                logger.warning(f"[{self.session_id}] 工单不存在: {ticket_number}")
+            
+            return None
+        except Exception as e:
+            logger.error(f"[{self.session_id}] 查询工单异常: {e}")
+            return None
     
-    def _get_zibiao(self, session: requests.Session, ticket_id: str) -> List[Dict]:
-        """获取子表数据"""
-        payload = {
-            "appName": self.APP_NAME,
-            "pageGuid": self.PAGE_GUID,
-            "rootEntityName": self.ROOT_ENTITY_NAME,
-            "rootWhere": f"id='{ticket_id}'",
-            "dataEntityName": "ITSRzibiao",
-            "isCustom": True,
-            "pageSize": 100,
-            "pageNum": 1,
-            "lang": "zh-CN"
+    def _get_zibiao(self, session: requests.Session, detail: Dict) -> List[Dict]:
+        """
+        通过 GraphQL 获取子表数据 (处理明细) - 参考 itsr_auto_close.py
+        
+        Args:
+            detail: 工单详情（包含 caseId, affairId, permissionId 等）
+        
+        Returns:
+            包含子表ID信息的列表，或空列表
+        """
+        case_id = detail.get('caseId')
+        affair_id = detail.get('affairId')
+        permission_id = detail.get('permissionId', '1111312494347391345')
+        form_record_id = detail.get('formRecordId')
+        template_id = detail.get('templateId', self.TEMPLATE_ID)
+        
+        if not all([case_id, affair_id, form_record_id]):
+            logger.warning(f"[{self.session_id}] 缺少必要参数，无法获取子表")
+            return []
+        
+        # GraphQL 查询详情（包含子表）
+        graphql_query = {
+            "query": """mutation graphqlLoader ($params0: bpmSummarySelectDetailPostInputBody) { 
+  data0: bpmSummarySelectDetailPost(body: $params0) { code data { content } message status } }""",
+            "variables": {
+                "params0": {
+                    "affairId": str(affair_id),
+                    "caseId": str(case_id),
+                    "detailType": "SHARE",
+                    "permissionId": str(permission_id),
+                    "templateId": str(template_id),
+                    "pageGuid": self.PAGE_GUID,
+                    "appName": self.APP_NAME,
+                    "rootEntityName": self.ROOT_ENTITY_NAME,
+                    "pageUrl": self.PAGE_URL,
+                    "pageType": "PC",
+                    "systemSettingCodes": ["COMMENTS_INPUT_BOX_SETTING", "ACTIVITY_INFORM_OPERATE", 
+                                          "AFFAIR_CONSULT_OPINION", "ACTIVITY_ADD_OPERATE", "BPM_OPINION"]
+                }
+            }
         }
         
-        resp = session.post(self.DETAIL_ENDPOINT, json=payload, timeout=30)
-        data = resp.json()
-        
-        if data.get('status') == 0:
-            return data.get('data', {}).get('list', [])
-        return []
+        try:
+            resp = session.post(
+                f"{self.GRAPHQL_ENDPOINT}?bpmSummarySelectDetailPost",
+                json=graphql_query,
+                timeout=30
+            )
+            
+            if resp.status_code != 200:
+                logger.warning(f"[{self.session_id}] GraphQL HTTP错误: {resp.status_code}")
+                return []
+            
+            data = resp.json()
+            
+            # 检查 GraphQL 响应状态
+            data0 = data.get('data', {}).get('data0', {})
+            gql_status = data0.get('status')
+            gql_message = data0.get('message', '')
+            logger.info(f"[{self.session_id}] GraphQL响应: status={gql_status}, message={gql_message}")
+            
+            if gql_status != 0:
+                logger.warning(f"[{self.session_id}] GraphQL查询失败: {gql_message}")
+                return []
+            
+            detail_content = data0.get('data', {}).get('content', {})
+            
+            # 调试：打印详情内容的顶层键
+            if detail_content:
+                logger.debug(f"[{self.session_id}] 详情内容键: {list(detail_content.keys())[:10]}")
+            
+            # 方法1：优先从 nodeGroupId 获取（参考 itsr_auto_close.py）
+            node_group_id = detail_content.get("nodeGroupId", "")
+            if node_group_id:
+                logger.info(f"[{self.session_id}] 从 nodeGroupId 获取子表ID: {node_group_id}")
+                return [{"id": node_group_id, "__key": node_group_id}]
+            
+            # 方法2：从 loadPageDto.data.chulimingxiDtoList 获取
+            load_page_dto = detail_content.get("loadPageDto", {})
+            form_data = load_page_dto.get("data", {})
+            if form_data:
+                chulimingxi_list = form_data.get("chulimingxiDtoList", [])
+                if chulimingxi_list:
+                    logger.info(f"[{self.session_id}] 从 loadPageDto 获取子表，数量: {len(chulimingxi_list)}")
+                    return chulimingxi_list
+            
+            # 方法3：从 bpmCaseDto.formData 获取
+            bpm_case = detail_content.get("bpmCaseDto", {})
+            if bpm_case.get("formData"):
+                try:
+                    import json as json_module
+                    fd = bpm_case["formData"]
+                    if isinstance(fd, str):
+                        fd = json_module.loads(fd)
+                    chulimingxi_list = fd.get("chulimingxiDtoList", [])
+                    if chulimingxi_list:
+                        logger.info(f"[{self.session_id}] 从 bpmCaseDto.formData 获取子表，数量: {len(chulimingxi_list)}")
+                        return chulimingxi_list
+                except Exception as e:
+                    logger.debug(f"[{self.session_id}] 解析 bpmCaseDto.formData 失败: {e}")
+            
+            # 方法4：从 formDto.formData 获取
+            form_dto = detail_content.get("formDto", {})
+            if form_dto:
+                fd = form_dto.get("formData", {})
+                chulimingxi_list = fd.get("chulimingxiDtoList", [])
+                if chulimingxi_list:
+                    logger.info(f"[{self.session_id}] 从 formDto 获取子表，数量: {len(chulimingxi_list)}")
+                    return chulimingxi_list
+            
+            logger.warning(f"[{self.session_id}] 未能从详情中提取子表数据")
+            return []
+            
+        except Exception as e:
+            logger.error(f"[{self.session_id}] 获取子表异常: {e}")
+            return []
     
     def _do_close(self, session: requests.Session, detail: Dict, zibiao: List[Dict]) -> Tuple[bool, str]:
-        """执行关单"""
-        form_data = {
-            "id": detail['id'],
-            "number": detail['number'],
-            "status": "close",
-            "closeStatus": "normal",
-            "solution": "已解决",
-            "solutionDetails": "已解决",
-            "answer": "已处理",
-            "ITSRzibiao": zibiao
-        }
+        """
+        执行关单 - 两步提交流程（参考 itsr_auto_close.py）
         
-        # PreCheck
-        precheck_payload = {
-            "appName": self.APP_NAME,
-            "pageGuid": self.PAGE_GUID,
-            "eventSourceGuid": "",
-            "nodeGuid": "",
-            "microFlowGuid": "",
-            "dataObject": {"ITSR": form_data},
-            "rootName": self.ROOT_ENTITY_NAME,
-            "url": self.PAGE_URL
-        }
+        Args:
+            detail: 工单详情（包含 caseId, affairId, formRecordId, permissionId 等）
+            zibiao: 子表数据（处理明细）
+        """
+        # 从详情中提取必要字段
+        case_id = str(detail.get('caseId', ''))
+        affair_id = str(detail.get('affairId', ''))
+        form_record_id = str(detail.get('formRecordId', ''))
+        permission_id = str(detail.get('permissionId', '1111312494347391345'))
         
-        resp = session.post(self.PRECHECK_ENDPOINT, json=precheck_payload, timeout=30)
-        precheck = resp.json()
+        if not all([case_id, affair_id, form_record_id]):
+            logger.error(f"[{self.session_id}] 缺少必要参数: caseId={case_id}, affairId={affair_id}, "
+                        f"formRecordId={form_record_id}")
+            return False, "缺少必要的工单参数"
         
-        if precheck.get('status') != 0:
-            return False, f"PreCheck失败: {precheck.get('message')}"
+        # 获取子表ID（优先从 zibiao 列表获取，否则使用 form_record_id）
+        zibiaoshuju_id = ""
+        if zibiao:
+            zibiaoshuju_id = str(zibiao[0].get('id', zibiao[0].get('__key', '')))
         
-        precheck_data = precheck.get('data', {})
+        if not zibiaoshuju_id:
+            logger.warning(f"[{self.session_id}] 未获取到子表ID，尝试使用默认值")
+            zibiaoshuju_id = form_record_id  # 回退使用 form_record_id
         
-        # Submit
-        submit_payload = {
-            "appName": self.APP_NAME,
-            "pageGuid": self.PAGE_GUID,
-            "submitButtonGuid": "8a64c07e886983020189466af9460def",
-            "preMatchRequestDto": {
-                "conditionsOfLinks": precheck_data.get('conditionsOfLinks', {}),
-                "flowObjList": precheck_data.get('flowObjList', []),
-                "dataObj": {"ITSR": form_data}
+        # 生成请求ID
+        request_id = f"COLLOABORATION_{int(time.time() * 1000)}"
+        uid = self._uid if hasattr(self, '_uid') and self._uid else ""
+        
+        # ========== 第一步提交：带表单数据 ==========
+        first_payload = {
+            "changeNodeRequestDtos": [],
+            "affairId": affair_id,
+            "formData": {
+                "chulimingxiDtoList": [
+                    {
+                        "wentijieda": "Done.",
+                        "jiejuejiyufangcuoshi": "Done.",
+                        "__key": zibiaoshuju_id,
+                        "actionType": "UPDATE",
+                        "id": zibiaoshuju_id,
+                        "positionIndex": zibiaoshuju_id
+                    }
+                ],
+                "__key": form_record_id,
+                "actionType": "UPDATE",
+                "id": form_record_id,
+                "extraParamMap": {
+                    "formPermissionId": f"{permission_id}_PC"
+                }
             },
-            "formData": {"ITSR": form_data},
-            "url": self.PAGE_URL,
-            "opinion": "同意",
-            "rootName": self.ROOT_ENTITY_NAME
+            "preMatchRequestDto": {
+                "oneHandlerMatchNeedPop": False
+            },
+            "bpmOpinionDto": {
+                "id": None,
+                "objectId": case_id,
+                "subObjectId": affair_id,
+                "content": "Done.",
+                "richContent": "",
+                "attachmentStorageIds": [],
+                "opinion": "SUBMIT",
+                "showPerson": uid,
+                "extra": {
+                    "hidden": False,
+                    "opinionHidden": uid
+                },
+                "userIds": [],
+                "createUserName": "",
+                "hidden": False,
+                "operationCaption": '{"zh_CN":"提交","en":"Submit"}'
+            },
+            "evaluationRecordDtoList": [],
+            "informAddSelectPeoples": "[]",
+            "requestId": request_id
         }
         
-        resp = session.post(self.SUBMIT_ENDPOINT, json=submit_payload, timeout=30)
-        result = resp.json()
+        logger.info(f"[{self.session_id}] 执行第一次提交: caseId={case_id}, affairId={affair_id}")
         
-        if result.get('status') == 0:
-            return True, "关闭成功"
-        return False, result.get('message', '未知错误')
+        try:
+            resp = session.post(self.SUBMIT_ENDPOINT, json=first_payload, timeout=30)
+            logger.info(f"[{self.session_id}] 第一次Submit响应: HTTP {resp.status_code}")
+            
+            if resp.status_code != 200:
+                logger.error(f"[{self.session_id}] HTTP错误: {resp.status_code}, 响应: {resp.text[:500]}")
+                return False, f"HTTP错误: {resp.status_code}"
+            
+            first_result = resp.json()
+            status = first_result.get('status')
+            code = first_result.get('code', '')
+            message = first_result.get('message', '')
+            
+            logger.info(f"[{self.session_id}] 第一次Submit结果: status={status}, code={code}, message={message}")
+            
+            if status != 0:
+                logger.error(f"[{self.session_id}] ❌ 第一次提交失败: {message}")
+                return False, message or "第一次提交失败"
+            
+            # ========== 检查是否需要第二次提交 ==========
+            pre_match_response = first_result.get("data", {}).get("content", {}).get("preMatchResponseDto", {})
+            condition_map = pre_match_response.get("conditionMatchResultDtoMap", {})
+            
+            if condition_map:
+                # 需要第二次确认提交
+                logger.info(f"[{self.session_id}] 检测到条件匹配，执行第二次确认提交...")
+                
+                conditions_of_links = {key: False for key in condition_map.keys()}
+                
+                second_payload = {
+                    "changeNodeRequestDtos": [],
+                    "affairId": affair_id,
+                    "formData": {
+                        "id": form_record_id,
+                        "extraParamMap": {
+                            "formPermissionId": f"{permission_id}_PC"
+                        }
+                    },
+                    "preMatchRequestDto": {
+                        "conditionsOfLinks": conditions_of_links,
+                        "selectedPeoplesOfNodes": {},
+                        "nodeSubLicenseMap": {}
+                    },
+                    "formDataMap": {},
+                    "bpmOpinionDto": {
+                        "id": None,
+                        "objectId": case_id,
+                        "subObjectId": affair_id,
+                        "content": "Done.",
+                        "richContent": "",
+                        "attachmentStorageIds": [],
+                        "opinion": "SUBMIT",
+                        "showPerson": uid,
+                        "extra": {
+                            "hidden": False,
+                            "opinionHidden": uid
+                        },
+                        "userIds": [],
+                        "createUserName": "",
+                        "hidden": False,
+                        "operationCaption": '{"zh_CN":"提交","en":"Submit"}'
+                    },
+                    "evaluationRecordDtoList": [],
+                    "informAddSelectPeoples": "[]",
+                    "requestId": request_id
+                }
+                
+                resp = session.post(self.SUBMIT_ENDPOINT, json=second_payload, timeout=30)
+                logger.info(f"[{self.session_id}] 第二次Submit响应: HTTP {resp.status_code}")
+                
+                if resp.status_code != 200:
+                    logger.error(f"[{self.session_id}] HTTP错误: {resp.status_code}")
+                    return False, f"HTTP错误: {resp.status_code}"
+                
+                second_result = resp.json()
+                status = second_result.get('status')
+                code = second_result.get('code', '')
+                message = second_result.get('message', '')
+                
+                logger.info(f"[{self.session_id}] 第二次Submit结果: status={status}, code={code}, message={message}")
+                
+                if status == 0:
+                    logger.info(f"[{self.session_id}] ✅ 关单成功（两步提交）")
+                    return True, "关闭成功"
+                else:
+                    logger.error(f"[{self.session_id}] ❌ 第二次提交失败: {message}")
+                    return False, message or "第二次提交失败"
+            else:
+                # 一次提交即成功
+                logger.info(f"[{self.session_id}] ✅ 关单成功（一步提交）")
+                return True, "关闭成功"
+            
+        except Exception as e:
+            logger.error(f"[{self.session_id}] Submit异常: {e}")
+            return False, str(e)
 
 
 # ============================================================================
@@ -659,7 +1397,9 @@ class CloseManager:
             session = self._sessions.pop(session_id, None)
         
         if session:
-            session.cancel()
+            # 只有未完成的会话才需要 cancel
+            if session.status not in (SessionStatus.SUCCESS, SessionStatus.ERROR, SessionStatus.EXPIRED):
+                session.cancel()
             logger.info(f"移除会话: {session_id}")
     
     def _cleanup_loop(self):
@@ -712,12 +1452,37 @@ def create_close_session(ticket_numbers: List[str], update_db: bool = True) -> s
         session_id = create_close_session(["ITSR001", "ITSR002"])
         session_id = create_close_session(["ITSR001"], update_db=False)  # 不更新数据库
     """
+    # Preferred in web deployments: cache-backed state so it works across workers.
+    if _cache_enabled():
+        session_id = str(uuid.uuid4())[:8]
+        now = time.time()
+        state = {
+            "session_id": session_id,
+            "ticket_numbers": ticket_numbers or [],
+            "update_db": bool(update_db),
+            "created_at": now,
+            "updated_at": now,
+            "status": SessionStatus.WAITING_CREDENTIALS.value,
+            "error": "",
+            "results": [],
+        }
+        logger.info(f"[{session_id}] create_close_session: cache enabled, creating state for {len(ticket_numbers)} tickets")
+        _cache_set_state(session_id, state)
+        # Verify it was written
+        verify = _cache_get_state(session_id)
+        if verify:
+            logger.info(f"[{session_id}] create_close_session: state written and verified in cache")
+        else:
+            logger.error(f"[{session_id}] create_close_session: WARNING - state write failed verification!")
+        return session_id
+
+    # Fallback: legacy in-memory manager (single-process friendly).
     return get_manager().create_session(ticket_numbers, update_db)
 
 
 def submit_credentials(session_id: str, username: str, password: str) -> Tuple[bool, str]:
     """
-    提交账号密码，启动登录流程
+    提交账号密码，启动登录流程（自动判断是否需要验证码）
     
     Args:
         session_id: 会话ID
@@ -725,21 +1490,58 @@ def submit_credentials(session_id: str, username: str, password: str) -> Tuple[b
         password: 密码
     
     Returns:
-        (success, error_message)
-        - success=True 表示已到达验证码页面，等待输入验证码
-        - success=False 表示登录失败，error_message 包含错误信息
+        (success, message)
+        - success=True, message="" 表示需要验证码，等待输入
+        - success=True, message="NO_SMS_REQUIRED" 表示无需验证码，已自动开始关单
+        - success=False, message=错误信息 表示登录失败
     
     Example:
-        success, error = submit_credentials(session_id, "PY0121", "password")
+        success, msg = submit_credentials(session_id, "PY0121", "password")
         if success:
+            if msg == "NO_SMS_REQUIRED":
+                print("无需验证码，自动登录成功，正在关单...")
+                # 直接等待关单结果
+                result = wait_close_result(session_id)
+            else:
             print("请输入验证码")
+                # 需要调用 submit_sms_code
         else:
-            print(f"登录失败: {error}")
+            print(f"登录失败: {msg}")
     """
+    # Cache-backed mode: create executor locally, coordinate state via cache.
+    import sys
+    if _cache_enabled():
+        print(f"[{session_id}] submit_credentials: cache enabled, fetching state...", file=sys.stderr, flush=True)
+        state = _cache_get_state(session_id)
+        if not state:
+            print(f"[{session_id}] submit_credentials: state not found in cache!", file=sys.stderr, flush=True)
+            return False, "会话不存在或已过期"
+
+        status = str(state.get("status", "")).strip()
+        print(f"[{session_id}] submit_credentials: current status={status}", file=sys.stderr, flush=True)
+        if status and status != SessionStatus.WAITING_CREDENTIALS.value:
+            return False, f"状态错误: {status}"
+
+        # Best-effort cross-worker start lock to avoid duplicate runners.
+        if not _cache_try_mark_started(session_id):
+            print(f"[{session_id}] submit_credentials: already started, rejecting duplicate", file=sys.stderr, flush=True)
+            return False, "会话已开始处理，请勿重复提交"
+
+        ticket_numbers = list(state.get("ticket_numbers") or [])
+        update_db = bool(state.get("update_db", True))
+        print(f"[{session_id}] submit_credentials: creating CloseSession with {len(ticket_numbers)} tickets", file=sys.stderr, flush=True)
+
+        # Start a local CloseSession runner thread; it will persist progress to cache.
+        session = CloseSession(session_id, ticket_numbers, update_db=update_db)
+        result = session.submit_credentials(username, password)
+        print(f"[{session_id}] submit_credentials: returning result={result}", file=sys.stderr, flush=True)
+        return result
+
+    # Legacy in-memory mode.
     session = get_manager().get_session(session_id)
     if not session:
         return False, "会话不存在或已过期"
-    
+
     return session.submit_credentials(username, password)
 
 
@@ -768,15 +1570,62 @@ def submit_sms_code(session_id: str, sms_code: str) -> CloseSessionResult:
         else:
             print(f"失败: {result.error}")
     """
+    # Cache-backed mode: store SMS code and wait for runner completion via cache.
+    if _cache_enabled():
+        state = _cache_get_state(session_id)
+        if not state:
+            return CloseSessionResult(error="会话不存在或已过期")
+
+        def _debug(msg):
+            try:
+                with open("/tmp/itsr_close_debug.log", "a") as f:
+                    import datetime
+                    f.write(f"{datetime.datetime.now()} {msg}\n")
+                    f.flush()
+            except:
+                pass
+        status = str(state.get("status", "")).strip()
+        _debug(f"[{session_id}] submit_sms_code: cache status={status}, expecting={SessionStatus.WAITING_SMS.value}")
+        if status != SessionStatus.WAITING_SMS.value:
+            _debug(f"[{session_id}] submit_sms_code: STATUS MISMATCH! Returning error.")
+            return CloseSessionResult(error=f"状态错误: {status or 'unknown'}")
+
+        _cache_set_sms_code(session_id, sms_code)
+        _cache_update_state(session_id, sms_submitted_at=time.time())
+
+        start_time = time.time()
+        timeout = 180
+        while time.time() - start_time < timeout:
+            cur = _cache_get_state(session_id)
+            if not cur:
+                return CloseSessionResult(error="会话不存在或已过期")
+
+            cur_status = str(cur.get("status", "")).strip()
+            cur_results = _state_to_result_list(cur.get("results", []))
+            cur_error = str(cur.get("error", "") or "")
+
+            if cur_status == SessionStatus.SUCCESS.value:
+                return CloseSessionResult(success=True, results=cur_results, error=cur_error)
+            if cur_status == SessionStatus.ERROR.value:
+                return CloseSessionResult(success=False, results=cur_results, error=cur_error)
+            if cur_status == SessionStatus.EXPIRED.value:
+                return CloseSessionResult(success=False, results=cur_results, error=cur_error or "会话已过期")
+
+            time.sleep(0.5)
+
+        # Timed out waiting for completion
+        return CloseSessionResult(error="关单超时", results=_state_to_result_list(state.get("results", [])))
+
+    # Legacy in-memory mode.
     session = get_manager().get_session(session_id)
     if not session:
         return CloseSessionResult(error="会话不存在或已过期")
-    
+
     result = session.submit_sms_code(sms_code)
-    
+
     # 完成后移除会话
     get_manager().remove_session(session_id)
-    
+
     return result
 
 
@@ -790,6 +1639,11 @@ def cancel_session(session_id: str):
     Example:
         cancel_session(session_id)
     """
+    if _cache_enabled():
+        _cache_set_cancelled(session_id)
+        _cache_update_state(session_id, status=SessionStatus.EXPIRED.value, error="会话已取消")
+        return
+
     get_manager().remove_session(session_id)
 
 
@@ -801,17 +1655,84 @@ def get_session_status(session_id: str) -> Optional[str]:
         session_id: 会话ID
     
     Returns:
-        状态字符串，如 "waiting_credentials", "waiting_sms", "closing" 等
+        状态字符串，如 "waiting_credentials", "waiting_sms", "closing", "no_sms_required" 等
         如果会话不存在返回 None
     
     Example:
         status = get_session_status(session_id)
         print(f"当前状态: {status}")
     """
+    if _cache_enabled():
+        state = _cache_get_state(session_id)
+        if not state:
+            return None
+        status = state.get("status")
+        return str(status) if status else None
+
     session = get_manager().get_session(session_id)
     if session:
         return session.status.value
     return None
+
+
+def wait_close_result(session_id: str, timeout: int = 180) -> CloseSessionResult:
+    """
+    等待关单结果（用于无需验证码的情况）
+    
+    当 submit_credentials 返回 NO_SMS_REQUIRED 时，调用此函数等待关单完成
+    """
+    if _cache_enabled():
+        state = _cache_get_state(session_id)
+        if not state:
+            return CloseSessionResult(error="会话不存在或已过期")
+
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            cur = _cache_get_state(session_id)
+            if not cur:
+                return CloseSessionResult(error="会话不存在或已过期")
+
+            cur_status = str(cur.get("status", "")).strip()
+            cur_results = _state_to_result_list(cur.get("results", []))
+            cur_error = str(cur.get("error", "") or "")
+
+            if cur_status == SessionStatus.SUCCESS.value:
+                return CloseSessionResult(success=True, results=cur_results, error=cur_error)
+            if cur_status == SessionStatus.ERROR.value:
+                return CloseSessionResult(success=False, results=cur_results, error=cur_error)
+            if cur_status == SessionStatus.EXPIRED.value:
+                return CloseSessionResult(success=False, results=cur_results, error=cur_error or "会话已过期")
+
+            time.sleep(0.3)
+
+        return CloseSessionResult(error="关单超时", results=_state_to_result_list(state.get("results", [])))
+
+    session = get_manager().get_session(session_id)
+    if not session:
+        return CloseSessionResult(error="会话不存在或已过期")
+
+    # 等待完成
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        with session._lock:
+            if session.status == SessionStatus.SUCCESS:
+                result = CloseSessionResult(success=True, results=session.results)
+                get_manager().remove_session(session_id)
+                return result
+
+            if session.status == SessionStatus.ERROR:
+                result = CloseSessionResult(error=session.error, results=session.results)
+                get_manager().remove_session(session_id)
+                return result
+
+            if session.status == SessionStatus.EXPIRED:
+                result = CloseSessionResult(error="会话已过期", results=session.results)
+                get_manager().remove_session(session_id)
+                return result
+
+        time.sleep(0.3)
+
+    return CloseSessionResult(error="关单超时")
 
 
 # ============================================================================
@@ -821,6 +1742,10 @@ def get_session_status(session_id: str) -> Optional[str]:
 def close_tickets_interactive(ticket_numbers: List[str], update_db: bool = True) -> CloseSessionResult:
     """
     交互式关单（命令行测试用）
+    
+    自动判断是否需要验证码：
+    - 如果账号需要验证码，会提示输入
+    - 如果账号不需要验证码，会自动完成登录并关单
     
     Args:
         ticket_numbers: 工单号列表
@@ -840,12 +1765,19 @@ def close_tickets_interactive(ticket_numbers: List[str], update_db: bool = True)
     username = input("用户名: ").strip()
     password = input("密码: ").strip()
     
-    success, error = submit_credentials(session_id, username, password)
-    if not success:
-        print(f"❌ 登录失败: {error}")
-        return CloseSessionResult(error=error)
+    print("正在登录...")
+    success, msg = submit_credentials(session_id, username, password)
     
-    print("✅ 登录成功，等待验证码...")
+    if not success:
+        print(f"❌ 登录失败: {msg}")
+        return CloseSessionResult(error=msg)
+    
+    # 检查是否需要验证码
+    if msg == "NO_SMS_REQUIRED":
+        print("✅ 无需验证码，正在关闭工单...")
+        result = wait_close_result(session_id)
+    else:
+        print("✅ 登录成功，需要验证码...")
     
     # 输入验证码
     sms_code = input("验证码 (6位): ").strip()
@@ -895,4 +1827,3 @@ if __name__ == '__main__':
         close_tickets_interactive(tickets, update_db=not args.no_db)
     else:
         print("未输入工单号")
-

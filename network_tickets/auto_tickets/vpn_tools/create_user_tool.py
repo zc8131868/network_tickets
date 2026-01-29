@@ -1,3 +1,5 @@
+import os
+import time
 import requests
 import openpyxl
 import re
@@ -15,129 +17,251 @@ PHONE_PATTERN = re.compile(
 )
 
 
-
-#################################################### get token ########################################################################################
-endpoint = 'https://vpn.hk.chinamobile.com:8443'
-access_key_id = 'kGDarBmLTGmYzVtlPxpH'
-access_key_secret = 'wvYDfEVOaFlKUgnbEmCJoanojdiTBTjCXmvnLKde'
-
-url = f'{endpoint}/api/open/v1/token'
-
-payload = {
-    'access_key_id': access_key_id,
-    'access_key_secret': access_key_secret
-}
-
-try:
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
-    res = response.json()
-    print(res)
-    token = res['data']['access_token']
-except requests.exceptions.RequestException as e:
-    print(f'Error: {e}')
-
-#################################################### get department id ########################################################################################
-url = f'{endpoint}/api/open/v1/department/get_id'
-# print(f'token: {token}')
-header = {
-    'Authorization': token,
-}
-payload = {
-    'name': "Vendor",
-}
-
-try:
-    response = requests.post(url, json=payload, headers=header)
-    response.raise_for_status()
-    department_id = response.json()['data']['id']
-    print(f'department_id: {department_id}')
-except requests.exceptions.RequestException as e:
-    print(f'Error: {e}')
-
-#####################################################get manager id######################################################################################
-def get_manager_id(manager_email):
-    url = f'{endpoint}/api/open/v1/user/get_id'
-    header = {
-        'Authorization': token,
-    }
-
-    payload = {
-        'email': manager_email,
-    }
-    try:
-        response = requests.post(url, json=payload, headers=header)
-        response.raise_for_status()
-        res = response.json()
-        return res['data']['id']
-    except requests.exceptions.RequestException as e:
-        print(f'Error: {e}')    
-        return None
-#################################################### create user ########################################################################################
-def call_create_user_api(vendor_name, vendor_email, phone_number, manager_email):
+class VPNApiClient:
+    """VPN API client with automatic token refresh"""
     
-    now = datetime.now()
-    formatted_date_after1year = (now + timedelta(days=365)).strftime("%Y-%m-%d")
-    manager_id = get_manager_id(manager_email)
+    def __init__(self):
+        self.endpoint = 'https://vpn.hk.chinamobile.com:8443'
+        self.access_key_id = 'kGDarBmLTGmYzVtlPxpH'
+        self.access_key_secret = 'wvYDfEVOaFlKUgnbEmCJoanojdiTBTjCXmvnLKde'
+        self.token = None
+        self.token_expires_at = 0
+        self.department_id = None
     
-    if manager_id is None:
-        print(f'Failed to get manager id for {manager_email}')
-        return False
+    def _is_token_valid(self) -> bool:
+        """Check if current token is still valid (with 60s buffer)"""
+        return self.token is not None and time.time() < (self.token_expires_at - 60)
     
-    url = f'{endpoint}/api/open/v1/user/create'
-    header = {
-        'Authorization': token,
-    }
-    payload = {
-        'full_name': vendor_name,
-        'email': vendor_email,
-        'mobile': phone_number,
-        'manager_ids': [manager_id],
-        'department_id': department_id,
-        'invite_type': 3,
-        'expired_at': formatted_date_after1year,
-    }
-    try:
-        response = requests.post(url, json=payload, headers=header)
-        response.raise_for_status()
-        result = response.json()
-        # print(f'API Response: {result}')  # Debug: print the actual response
+    def _get_token(self) -> str:
+        """Get a valid token, refreshing if necessary"""
+        if self._is_token_valid():
+            return self.token
         
-        # Check if 'data' key exists in the response
-        if 'data' in result:
-            if isinstance(result['data'], dict) and 'result' in result['data']:
-                if result['data']['result'] == 'success':
-                    return {'success': True, 'user_id': result['data']['id'], 'error': None}
+        url = f'{self.endpoint}/api/open/v1/token'
+        payload = {
+            'access_key_id': self.access_key_id,
+            'access_key_secret': self.access_key_secret
+        }
+        
+        try:
+            response = requests.post(url, json=payload)
+            response.raise_for_status()
+            res = response.json()
+            print(f'Token response: {res}')
+            
+            if 'data' not in res:
+                raise Exception(f"Unexpected token response: {res}")
+            
+            self.token = res['data']['access_token']
+            expires_in = res['data'].get('expires_in', 7200)
+            self.token_expires_at = time.time() + expires_in
+            print(f'✅ Token refreshed, expires in {expires_in} seconds')
+            return self.token
+        except requests.exceptions.RequestException as e:
+            print(f'Error getting token: {e}')
+            raise
+        except KeyError as e:
+            print(f'Error parsing token response: {e}')
+            raise
+    
+    def _get_headers(self) -> dict:
+        """Get headers with valid token"""
+        return {'Authorization': self._get_token()}
+    
+    def get_department_id(self, name: str = "Vendor") -> str:
+        """Get department ID by name"""
+        if self.department_id is not None:
+            return self.department_id
+        
+        url = f'{self.endpoint}/api/open/v1/department/get_id'
+        payload = {'name': name}
+        
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            self.department_id = response.json()['data']['id']
+            print(f'department_id: {self.department_id}')
+            return self.department_id
+        except requests.exceptions.RequestException as e:
+            print(f'Error getting department ID: {e}')
+            raise
+    
+    def get_manager_id(self, manager_email: str) -> str:
+        """Get manager ID by email"""
+        url = f'{self.endpoint}/api/open/v1/user/get_id'
+        payload = {'email': manager_email}
+        
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            res = response.json()
+            return res['data']['id']
+        except requests.exceptions.RequestException as e:
+            print(f'Error getting manager ID: {e}')
+            return None
+    
+    def create_user(self, vendor_name: str, vendor_email: str, phone_number: str, manager_email: str) -> dict:
+        """Create a VPN user account"""
+        now = datetime.now()
+        formatted_date_after1year = (now + timedelta(days=365)).strftime("%Y-%m-%d")
+        
+        manager_id = self.get_manager_id(manager_email)
+        if manager_id is None:
+            print(f'Failed to get manager id for {manager_email}')
+            return {'success': False, 'user_id': None, 'error': f'{vendor_name}: Failed to get manager ID for {manager_email}'}
+        
+        department_id = self.get_department_id()
+        
+        url = f'{self.endpoint}/api/open/v1/user/create'
+        payload = {
+            'full_name': vendor_name,
+            'email': vendor_email,
+            'mobile': phone_number,
+            'manager_ids': [manager_id],
+            'department_id': department_id,
+            'invite_type': 3,
+            'expired_at': formatted_date_after1year,
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            result = response.json()
+            
+            if 'data' in result:
+                if isinstance(result['data'], dict) and 'result' in result['data']:
+                    if result['data']['result'] == 'success':
+                        return {'success': True, 'user_id': result['data']['id'], 'error': None}
+                    else:
+                        error_msg = result.get('message', 'Unknown error')
+                        print(f'{vendor_name}: {error_msg}')
+                        return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
                 else:
-                    error_msg = result.get('message', 'Unknown error')
-                    print(f'{vendor_name}: {error_msg}')
+                    error_msg = f'Unexpected response structure: {result}'
+                    print(error_msg)
                     return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
             else:
-                # 'data' exists but doesn't have 'result' key - might be a different response structure
-                error_msg = f'Unexpected response structure: {result}'
-                print(error_msg)
-                return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
-        else:
-            # No 'data' key - check for error message or other structure
-            if 'message' in result:
-                error_msg = f'{vendor_name}: {result["message"]}'
-                print(error_msg)
-                return {'success': False, 'user_id': None, 'error': error_msg}
+                if 'message' in result:
+                    error_msg = f'{vendor_name}: {result["message"]}'
+                    print(error_msg)
+                    return {'success': False, 'user_id': None, 'error': error_msg}
+                else:
+                    error_msg = f'Unexpected response format: {result}'
+                    print(error_msg)
+                    return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
+        except requests.exceptions.RequestException as e:
+            error_msg = f'{vendor_name}: {e}'
+            print(error_msg)
+            return {'success': False, 'user_id': None, 'error': error_msg}
+        except KeyError as e:
+            error_msg = f'KeyError: Missing key {e} in response: {result}'
+            print(error_msg)
+            return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
+    
+    def get_user_id(self, identifier: str) -> str:
+        """Get user ID by email or name"""
+        url = f'{self.endpoint}/api/open/v1/user/get_id'
+        payload = {'email': identifier}
+        
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            res = response.json()
+            return res['data']['id']
+        except requests.exceptions.RequestException as e:
+            print(f'Error getting user ID for {identifier}: {e}')
+            return None
+        except KeyError:
+            print(f'User not found: {identifier}')
+            return None
+    
+    def create_resource(self, ticket_number: str, dip_list: list, dport_list: list, protocol_list: list) -> dict:
+        """Create a VPN ACL resource"""
+        url = f'{self.endpoint}/api/open/v1/vpn/acl/resource/create'
+        payload = {
+            'key': ticket_number,
+            'type': 'ip',
+            'protocols': protocol_list,
+            'addrs': dip_list,
+            'ports': dport_list,
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            result = response.json()
+            if result['code'] == 0:
+                print(f'Resource creation for {ticket_number} successful: {result}')
+                return {'success': True, 'resource_id': result["data"]["resource_id"], 'error': None}
             else:
-                error_msg = f'Unexpected response format: {result}'
-                print(error_msg)
-                return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
-    except requests.exceptions.RequestException as e:
-        error_msg = f'{vendor_name}: {e}'
-        print(error_msg)
-        return {'success': False, 'user_id': None, 'error': error_msg}
-    except KeyError as e:
-        error_msg = f'KeyError: Missing key {e} in response: {result}'
-        print(error_msg)
-        return {'success': False, 'user_id': None, 'error': f'{vendor_name}: {error_msg}'}
+                error_msg = result.get('message', 'Unknown error')
+                print(f'{ticket_number}: Resource creation failed - {error_msg}')
+                return {'success': False, 'resource_id': None, 'error': f'{ticket_number}: Resource creation failed - {error_msg}'}
+        except requests.exceptions.RequestException as e:
+            error_msg = f'Resource creation for {ticket_number} failed: {e}'
+            print(error_msg)
+            return {'success': False, 'resource_id': None, 'error': error_msg}
+        except KeyError as e:
+            error_msg = f'Resource creation for {ticket_number} failed: Missing key {e} in response: {result}'
+            print(error_msg)
+            return {'success': False, 'resource_id': None, 'error': error_msg}
+        except Exception as e:
+            error_msg = f'Resource creation for {ticket_number} failed: {e}'
+            print(error_msg)
+            return {'success': False, 'resource_id': None, 'error': error_msg}
+    
+    def create_policy(self, ticket_number: str, resource_id_list: list, user_id_list: list) -> dict:
+        """Create a VPN ACL policy"""
+        url = f'{self.endpoint}/api/open/v1/vpn/acl/policy/create'
+        payload = {
+            'key': ticket_number,
+            'action': 1,
+            'priority': 0,
+            'resource_ids': resource_id_list,
+            'user_ids': user_id_list,
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers())
+            response.raise_for_status()
+            result = response.json()
+            if result['code'] == 0:
+                print(f'Policy creation for {ticket_number} successful: {result}')
+                return {'success': True, 'policy_id': result["data"]["id"], 'error': None}
+            else:
+                error_msg = result.get('message', 'Unknown error')
+                print(f'{ticket_number}: Policy creation failed - {error_msg}')
+                return {'success': False, 'policy_id': None, 'error': f'{ticket_number}: Policy creation failed - {error_msg}'}
+        except requests.exceptions.RequestException as e:
+            error_msg = f'Policy creation for {ticket_number} failed: {e}'
+            print(error_msg)
+            return {'success': False, 'policy_id': None, 'error': error_msg}
+        except KeyError as e:
+            error_msg = f'Policy creation for {ticket_number} failed: Missing key {e} in response'
+            print(error_msg)
+            return {'success': False, 'policy_id': None, 'error': error_msg}
+        except Exception as e:
+            error_msg = f'Policy creation for {ticket_number} failed: {e}'
+            print(error_msg)
+            return {'success': False, 'policy_id': None, 'error': error_msg}
+
+
+# Global client instance (lazy initialization - no API calls until first use)
+_vpn_client = None
+
+def get_vpn_client() -> VPNApiClient:
+    """Get or create the VPN API client"""
+    global _vpn_client
+    if _vpn_client is None:
+        _vpn_client = VPNApiClient()
+    return _vpn_client
+
 
 
 def create_vpn_user_tool(wb):
+    # Get VPN API client (with auto token refresh)
+    vpn_client = get_vpn_client()
+    
     sheet = wb.active
 
     start_row = 4
@@ -251,7 +375,7 @@ def create_vpn_user_tool(wb):
         if row not in vendor_name_dic:
             continue  # Skip rows with validation errors
         
-        result = call_create_user_api(vendor_name_dic[row], vendor_email_dic[row], phone_number_dic[row], manager_email_dic[row])
+        result = vpn_client.create_user(vendor_name_dic[row], vendor_email_dic[row], phone_number_dic[row], manager_email_dic[row])
         if result['success']:
             print(f'Successful to create an account for {vendor_name_dic[row]}')
             res[vendor_name_dic[row]] = result['user_id']
@@ -264,5 +388,9 @@ def create_vpn_user_tool(wb):
 
 
 if __name__ == '__main__':
-    res = create_vpn_user_tool()
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(script_dir, 'VPN_Account_Ticket_Sample_test.xlsx')
+    wb = openpyxl.load_workbook(file_path)
+    res = create_vpn_user_tool(wb)
     print(f'res: {res}')

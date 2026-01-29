@@ -1,147 +1,13 @@
-import requests
 import openpyxl
 import re
 
-
-endpoint = 'https://vpn.hk.chinamobile.com:8443'
-access_key_id = 'kGDarBmLTGmYzVtlPxpH'
-access_key_secret = 'wvYDfEVOaFlKUgnbEmCJoanojdiTBTjCXmvnLKde'
-
-url = f'{endpoint}/api/open/v1/token'
-
-payload = {
-    'access_key_id': access_key_id,
-    'access_key_secret': access_key_secret
-}
-
-try:
-    response = requests.post(url, json=payload)
-    response.raise_for_status()
-    res = response.json()
-    print(res)
-    token = res['data']['access_token']
-except requests.exceptions.RequestException as e:
-    print(f'Error: {e}')
-
-#################################################### get department id ########################################################################################
-url = f'{endpoint}/api/open/v1/department/get_id'
-# print(f'token: {token}')
-header = {
-    'Authorization': token,
-}
-payload = {
-    'name': "Vendor",
-}
-
-try:
-    response = requests.post(url, json=payload, headers=header)
-    response.raise_for_status()
-    department_id = response.json()['data']['id']
-    print(f'department_id: {department_id}')
-except requests.exceptions.RequestException as e:
-    print(f'Error: {e}')
-
-#####################################################get manager id######################################################################################
-def get_manager_id(manager_email):
-    url = f'{endpoint}/api/open/v1/user/get_id'
-    header = {
-        'Authorization': token,
-    }
-
-    payload = {
-        'email': manager_email,
-    }
-    try:
-        response = requests.post(url, json=payload, headers=header)
-        response.raise_for_status()
-        res = response.json()
-        return res['data']['id']
-    except requests.exceptions.RequestException as e:
-        print(f'Error: {e}')    
-        return None
-
-##################################################################################################################
-
-#########################create resource########################################################################################
-
-def call_create_resource_api(ticket_number, dip_list, dport_list, protocol_list):
-    url = f'{endpoint}/api/open/v1/vpn/acl/resource/create'
-    header = {
-        'Authorization': token,
-    }
-    payload = {
-        'key': ticket_number,
-        'type': 'ip',
-        'protocols': protocol_list,
-        'addrs': dip_list,
-        'ports': dport_list,
-    }
-
-    try:
-        response = requests.post(url, json=payload, headers=header)
-        response.raise_for_status()
-        result = response.json()
-        if result['code'] == 0:
-            print(f'Resource creation for {ticket_number} successful: {result}')
-            return {'success': True, 'resource_id': result["data"]["resource_id"], 'error': None}
-        else:
-            error_msg = result.get('message', 'Unknown error')
-            print(f'{ticket_number}: Resource creation failed - {error_msg}')
-            return {'success': False, 'resource_id': None, 'error': f'{ticket_number}: Resource creation failed - {error_msg}'}
-    except requests.exceptions.RequestException as e:
-        error_msg = f'Resource creation for {ticket_number} failed: {e}'
-        print(error_msg)
-        return {'success': False, 'resource_id': None, 'error': error_msg}
-    except KeyError as e:
-        error_msg = f'Resource creation for {ticket_number} failed: Missing key {e} in response: {result}'
-        print(error_msg)
-        return {'success': False, 'resource_id': None, 'error': error_msg}
-    except Exception as e:
-        error_msg = f'Resource creation for {ticket_number} failed: {e}'
-        print(error_msg)
-        return {'success': False, 'resource_id': None, 'error': error_msg}
-
-
-
-def call_create_policy_api(ticket_number, resource_id_list, user_id_list):
-    url = f'{endpoint}/api/open/v1/vpn/acl/policy/create'
-    header = {
-        'Authorization': token,
-    }
-    payload = {
-        'key': ticket_number,
-        'action': 1,
-        'priority': 0,
-        'resource_ids': resource_id_list,
-        'user_ids': user_id_list,
-        # 'department_ids': [department_id],
-    }
-
-    try:
-        response = requests.post(url, json=payload, headers=header)
-        response.raise_for_status()
-        result = response.json()
-        if result['code'] == 0:
-            print(f'Policy creation for {ticket_number} successful: {result}')
-            return {'success': True, 'policy_id': result["data"]["id"], 'error': None}
-        else:
-            error_msg = result.get('message', 'Unknown error')
-            print(f'{ticket_number}: Policy creation failed - {error_msg}')
-            return {'success': False, 'policy_id': None, 'error': f'{ticket_number}: Policy creation failed - {error_msg}'}
-    except requests.exceptions.RequestException as e:
-        error_msg = f'Policy creation for {ticket_number} failed: {e}'
-        print(error_msg)
-        return {'success': False, 'policy_id': None, 'error': error_msg}
-    except KeyError as e:
-        error_msg = f'Policy creation for {ticket_number} failed: Missing key {e} in response'
-        print(error_msg)
-        return {'success': False, 'policy_id': None, 'error': error_msg}
-    except Exception as e:
-        error_msg = f'Policy creation for {ticket_number} failed: {e}'
-        print(error_msg)
-        return {'success': False, 'policy_id': None, 'error': error_msg}
+# Import the shared VPN API client with automatic token refresh
+from auto_tickets.vpn_tools.create_user_tool import get_vpn_client
 
 def create_vpn_access_policy_tool(wb):
+    # Get VPN API client (with auto token refresh)
+    vpn_client = get_vpn_client()
+    
     sheet = wb.active
     pattern = r'[ ,\n、，]'
     start_row = 4
@@ -283,7 +149,7 @@ def create_vpn_access_policy_tool(wb):
 
         user_id_list = []
         for vendor_name in vendor_name_dic[row]:
-            user_id = get_manager_id(vendor_name)
+            user_id = vpn_client.get_user_id(vendor_name)
             if user_id:
                 user_id_list.append(user_id)
             else:
@@ -297,12 +163,12 @@ def create_vpn_access_policy_tool(wb):
 
         ticket_number = ticket_number_dic[row] + "_" + str(row)
 
-        resource_result = call_create_resource_api(ticket_number, dip_dic[row], dport_dic[row], protocol_dic[row])
+        resource_result = vpn_client.create_resource(ticket_number, dip_dic[row], dport_dic[row], protocol_dic[row])
         if resource_result['success']:
             print(f'Successful to create a resource policy for {ticket_number}')
             resource_id = resource_result['resource_id']
             
-            policy_result = call_create_policy_api(ticket_number, [resource_id], user_id_list)
+            policy_result = vpn_client.create_policy(ticket_number, [resource_id], user_id_list)
             if policy_result['success']:
                 print(f'Successful to create a policy for {ticket_number}')
                 success_results.append({

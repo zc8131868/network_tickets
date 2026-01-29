@@ -1,0 +1,70 @@
+2026-01-29 09:08:07 - INFO - 📂 发现 EOMS 缓存登录状态
+2026-01-29 09:08:11 - INFO - ✅ EOMS 缓存有效，无需重新登录
+2026-01-29 09:08:11 - ERROR - get_data_new JSON 解析失败: Expecting value: line 1 column 1 (char 0)
+2026-01-29 09:08:11 - INFO - Response text: <!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="renderer" content="webkit">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="icon" href="/favicon.ico">
+  <title>TRY</title>
+  <!--[if lt IE 11]><script>window.location.href='/html/ie.html';</script><![endif]-->
+    <!-- JSSDK -->
+    <script type="text/javascript" src="https://lf1-cdn-tos.byte
+2026-01-29 09:08:11 - WARNING - 返回了 HTML 页面，NCOA SESSION 可能过期
+2026-01-29 09:08:11 - ERROR - get_data_old JSON 解析失败: Expecting value: line 1 column 1 (char 0)
+2026-01-29 09:08:11 - INFO - Response text: <!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="renderer" content="webkit">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="icon" href="/favicon.ico">
+  <title>TRY</title>
+  <!--[if lt IE 11]><script>window.location.href='/html/ie.html';</script><![endif]-->
+    <!-- JSSDK -->
+    <script type="text/javascript" src="https://lf1-cdn-tos.byte
+2026-01-29 09:08:11 - WARNING - 返回了 HTML 页面，NCOA SESSION 可能过期
+2026-01-29 09:09:11 - ERROR - get_data_new JSON 解析失败: Expecting value: line 1 column 1 (char 0)
+2026-01-29 09:09:11 - INFO - Response text: <!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="renderer" content="webkit">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="icon" href="/favicon.ico">
+  <title>TRY</title>
+  <!--[if lt IE 11]><script>window.location.href='/html/ie.html';</script><![endif]-->
+    <!-- JSSDK -->
+    <script type="text/javascript" src="https://lf1-cdn-tos.byte
+2026-01-29 09:09:11 - WARNING - 返回了 HTML 页面，NCOA SESSION 可能过期
+2026-01-29 09:09:11 - ERROR - NCOA SESSION 过期，已重试 3 次，停止脚本执行
+2026-01-29 09:09:12 - ERROR - get_data_old JSON 解析失败: Expecting value: line 1 column 1 (char 0)
+2026-01-29 09:09:12 - INFO - Response text: <!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="renderer" content="webkit">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <link rel="icon" href="/favicon.ico">
+  <title>TRY</title>
+  <!--[if lt IE 11]><script>window.location.href='/html/ie.html';</script><![endif]-->
+    <!-- JSSDK -->
+    <script type="text/javascript" src="https://lf1-cdn-tos.byte
+2026-01-29 09:09:12 - WARNING - 返回了 HTML 页面，NCOA SESSION 可能过期
+2026-01-29 09:09:12 - ERROR - NCOA SESSION 过期，已重试 3 次，停止脚本执行
+2026-01-29 09:09:12 - INFO - 已发送 SESSION 过期告警到飞书
+2026-01-29 09:09:12 - INFO - 已发送 SESSION 过期告警到飞书
+2026-01-29 09:13:36 - INFO - 📂 发现 EOMS 缓存登录状态
+2026-01-29 09:13:39 - INFO - ✅ EOMS 缓存有效，无需重新登录
+2026-01-29 09:13:39 - WARNING - get_data_new 网络连接错误（不发送告警，60秒后重试）: Invalid URL '10.0.17.170/gateway/todo/todo/todo/list?pageNum=1&pageSize=10&title=&sender=&beginTime=2026-01-29&endTime=2026-01-29%2023%3A59%3A59&sort=0&drafter=&timeoutPriority=true&uuid=': No scheme supplied. Perhaps you meant https://10.0.17.170/gateway/todo/todo/todo/list?pageNum=1&pageSize=10&title=&sender=&beginTime=2026-01-29&endTime=2026-01-29%2023%3A59%3A59&sort=0&drafter=&timeoutPriority=true&uuid=?
+2026-01-29 09:13:39 - WARNING - get_data_old 网络连接错误（不发送告警，60秒后重试）: Invalid URL '10.0.17.170/gateway/todo/todo/todo/list?pageNum=1&pageSize=10&title=&sender=&beginTime=&endTime=&sort=0&drafter=&categoryId=202401250048649563&timeoutPriority=true&curStep=': No scheme supplied. Perhaps you meant https://10.0.17.170/gateway/todo/todo/todo/list?pageNum=1&pageSize=10&title=&sender=&beginTime=&endTime=&sort=0&drafter=&categoryId=202401250048649563&timeoutPriority=true&curStep=?

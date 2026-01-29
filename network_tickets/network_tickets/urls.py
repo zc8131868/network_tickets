@@ -39,6 +39,14 @@ from auto_tickets.views.create_vendor_vpn_account import create_vendor_vpn_accou
 from auto_tickets.views.download_vpn_sample import download_vpn_sample
 from auto_tickets.views.download_vpn_network_sample import download_vpn_network_sample
 from auto_tickets.views.delete_vendor_vpn_account import delete_vendor_vpn_account
+from auto_tickets.views.itsr_close_api import (
+    create_close_session_api,
+    submit_credentials_api,
+    submit_sms_code_api,
+    get_session_status_api,
+    cancel_session_api,
+    update_itsr_status_api
+)
 
 
 
@@ -73,6 +81,13 @@ urlpatterns = [
     path('download_vpn_sample/', download_vpn_sample, name='download_vpn_sample'),
     path('download_vpn_network_sample/', download_vpn_network_sample, name='download_vpn_network_sample'),
     path('delete_vendor_vpn_account/', delete_vendor_vpn_account, name='delete_vendor_vpn_account'),
+    # ITSR Close API endpoints
+    path('api/itsr_close/create_session/', create_close_session_api, name='itsr_close_create_session'),
+    path('api/itsr_close/submit_credentials/', submit_credentials_api, name='itsr_close_submit_credentials'),
+    path('api/itsr_close/submit_sms/', submit_sms_code_api, name='itsr_close_submit_sms'),
+    path('api/itsr_close/session_status/', get_session_status_api, name='itsr_close_session_status'),
+    path('api/itsr_close/cancel_session/', cancel_session_api, name='itsr_close_cancel_session'),
+    path('api/itsr_close/update_itsr_status/', update_itsr_status_api, name='itsr_close_update_itsr_status'),
 ]
 
 
