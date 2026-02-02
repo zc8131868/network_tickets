@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'network_tickets.settings')
 django.setup()
-from auto_tickets.models import IPDB, IP_Application, PA_Service
+from auto_tickets.models import IPDB, IP_Application
 
 
 # print(network)
@@ -86,38 +86,53 @@ def get_device(ip_input):
         return None 
 
 
-if __name__ == '__main__':
-    print(get_device('10.0.40.44'))
+# if __name__ == '__main__':
+#     print(get_device('10.0.40.44'))
 
 
 
 
 
-def tickets_split(source_ip, destination_ip):
+def _extract_tickets_from_string(result_str):
+    """
+    Helper function to extract ticket names from the result string.
+    Extracts items after "Tickets contain:" that match pattern like "1)EOMS-Cloud", "2)EOMS-SN", etc.
+    """
+    import re
+    if not result_str or 'Tickets contain:' not in result_str:
+        return []
+    
+    # Find the part after "Tickets contain:"
+    tickets_part = result_str.split('Tickets contain:')[1] if 'Tickets contain:' in result_str else ''
+    
+    # Extract ticket names using regex pattern: number)TicketName
+    # Pattern matches: 1)EOMS-Cloud, 2)EOMS-SN, etc.
+    pattern = r'\d+\)([^\n]+)'
+    matches = re.findall(pattern, tickets_part)
+    
+    # Clean up ticket names (strip whitespace)
+    tickets = [ticket.strip() for ticket in matches if ticket.strip()]
+    
+    return tickets
 
-    '''
-    DMZ SW01: SN OAM, AliCloud,AliCloud-Mylink, PrivateCloud-TP
-    DMZ SW02: NewPrivateCloud, PrivateCloud, SN PCloud
-    M09-CORE-SW01: PrivateCloud
-    M09-EXT-CORE-SW1: PrivateCloud-TP
-    M09-INT-SW01: PrivateCloud
-    M09-SB-SW01: South Base
-    PA: South Base, SN PCloud, Taiping PCloud-VM
-    T01-DR-CORE-SW01: PrivateCloud-GNC
-    '''
 
+def _tickets_split_internal(source_ip, destination_ip):
+    """
+    Internal function that always returns a string.
+    This contains the original logic of tickets_split.
+    """
     source_location = get_location(source_ip)
     destination_location = get_location(destination_ip)
     
     source_device = get_device(source_ip)
     destination_device = get_device(destination_ip)
 
-
     print(f'source_location: {source_location}, destination_location: {destination_location}, source_device: {source_device}, destination_device: {destination_device}')
 
     # Check if we got valid locations
     if source_location is None or destination_location is None:
         return 'Unknown IP. Please report to IT, thank you.'
+    
      #DMZ SW01
     if source_device == 'DMZ SW01' and destination_device == 'DMZ SW02':
         if source_location == 'SN OAM' and destination_location == 'NewPrivateCloud':
@@ -659,11 +674,47 @@ def tickets_split(source_ip, destination_ip):
         return f'{source_ip} belongs to {source_location}, the source device is {source_device}. {destination_ip} belongs to {destination_location}. the destination device is {destination_device}.'
 
 
+def tickets_split(source_ip, destination_ip, return_list=False):
+    '''
+    Split tickets based on source and destination IPs.
+    
+    Args:
+        source_ip: Source IP address
+        destination_ip: Destination IP address
+        return_list: If True, returns a list of ticket names. If False (default), returns formatted string.
+    
+    Returns:
+        str: Formatted string with ticket information (default)
+        list: List of ticket names (when return_list=True)
+        
+    Note: The function always prints the result string to console, regardless of return_list parameter.
+        
+    DMZ SW01: SN OAM, AliCloud,AliCloud-Mylink, PrivateCloud-TP
+    DMZ SW02: NewPrivateCloud, PrivateCloud, SN PCloud
+    M09-CORE-SW01: PrivateCloud
+    M09-EXT-CORE-SW1: PrivateCloud-TP
+    M09-INT-SW01: PrivateCloud
+    M09-SB-SW01: South Base
+    PA: South Base, SN PCloud, Taiping PCloud-VM
+    T01-DR-CORE-SW01: PrivateCloud-GNC
+    '''
+    # Get the string result from the internal function (this also prints debug info)
+    result_str = _tickets_split_internal(source_ip, destination_ip)
+    
+    # Always print the result string (original behavior)
+    print(result_str)
+    
+    # Process based on return_list parameter
+    if return_list:
+        return _extract_tickets_from_string(result_str)
+    return result_str
 
-# if __name__ == '__main__':
-#     source_ip = '10.0.170.1'
-#     destination_ip = '10.0.61.16'
-#     print(tickets_split(source_ip, destination_ip))
+
+
+if __name__ == '__main__':
+    source_ip = '10.0.170.1'
+    destination_ip = '10.0.61.16'
+    print(tickets_split(source_ip, destination_ip, return_list=True))
 
 
 def generate_subnet(network, num_ip_addresses, existing_subnets=None):

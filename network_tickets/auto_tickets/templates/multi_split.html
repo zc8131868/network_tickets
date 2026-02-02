@@ -106,6 +106,21 @@
         border-radius: 1rem;
         color: #991b1b;
     }
+    
+    /* Disabled ticket creation button styles */
+    #cloud-ticket-btn:disabled,
+    #sn-ticket-btn:disabled {
+        opacity: 0.6 !important;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+    }
+    
+    #cloud-ticket-btn .spinner-border,
+    #sn-ticket-btn .spinner-border {
+        width: 1rem;
+        height: 1rem;
+        border-width: 0.15em;
+    }
     </style>
 {% endblock head %}
 
@@ -273,6 +288,49 @@
                                 </button>
                             </div>
                         </div>
+                        
+                        <!-- Ticket Creation Buttons -->
+                        {% if show_cloud_button or show_sn_button %}
+                        <div class="alert alert-info mb-3" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #3b82f6; border-radius: 1rem;">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h5 class="mb-1"><i class="fas fa-info-circle me-2"></i>EOMS Ticket Creation Available</h5>
+                                    <p class="mb-0">EOMS ticket requests detected. Create tickets via Netcare.</p>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    {% if show_cloud_button %}
+                                    <form method="post" id="cloud-ticket-form" style="display: inline-block;" onsubmit="return handleTicketCreation(event, 'cloud');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="create_ticket" value="1">
+                                        <input type="hidden" name="target_department" value="Cloud">
+                                        <button type="submit" id="cloud-ticket-btn" class="btn btn-primary btn-lg me-2 mb-2" style="width: 250px;">
+                                            <i class="fas fa-cloud me-2"></i>Raise Tickets to EOMS Cloud
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    {% if show_sn_button %}
+                                    <form method="post" id="sn-ticket-form" style="display: inline-block;" onsubmit="return handleTicketCreation(event, 'sn');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="create_ticket" value="1">
+                                        <input type="hidden" name="target_department" value="SN">
+                                        <button type="submit" id="sn-ticket-btn" class="btn btn-success btn-lg mb-2" style="width: 250px;">
+                                            <i class="fas fa-network-wired me-2"></i>Raise Tickets to EOMS SN
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
                         
                         <div class="results-container">
                             {% for result in result_list %}
@@ -511,6 +569,284 @@ function copyAllErrors() {
     });
 }
 
+// Prevent duplicate ticket creation
+let ticketCreationInProgress = {
+    cloud: false,
+    sn: false
+};
+
+// Store original button HTML for restoration
+let buttonOriginalHTML = {
+    cloud: null,
+    sn: null
+};
+
+function handleTicketCreation(event, department) {
+    // Get button and form
+    const btnId = department === 'cloud' ? 'cloud-ticket-btn' : 'sn-ticket-btn';
+    const btn = document.getElementById(btnId);
+    const form = event.target.closest('form') || event.target.form;
+    
+    // If button is already disabled, prevent submission
+    if (btn && btn.disabled) {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+    }
+    
+    // Prevent default form submission if already in progress
+    if (ticketCreationInProgress[department]) {
+        event.preventDefault();
+        event.stopPropagation();
+        alert('⏳ Ticket creation is already in progress. Please wait...');
+        return false;
+    }
+    
+    // Prevent default form submission to show confirmation first
+    event.preventDefault();
+    
+    // Store original HTML if not already stored
+    if (btn && !buttonOriginalHTML[department]) {
+        buttonOriginalHTML[department] = btn.innerHTML;
+    }
+    
+    // Confirm action
+    const deptName = department === 'cloud' ? 'Cloud' : 'SN';
+    const confirmed = confirm('Are you sure you want to create a ticket for ' + deptName + ' department?');
+    
+    if (!confirmed) {
+        // User cancelled - do nothing, button remains enabled
+        return false;
+    }
+    
+    // User confirmed - disable button and submit form
+    ticketCreationInProgress[department] = true;
+    
+    if (btn) {
+        // Disable button immediately
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+        btn.setAttribute('aria-disabled', 'true');
+        
+        // Show creating state
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creating...';
+        
+        // Store in sessionStorage to keep button disabled after page reload
+        sessionStorage.setItem(`ticket_${department}_submitted`, 'true');
+        sessionStorage.setItem(`ticket_${department}_timestamp`, Date.now().toString());
+        
+        // Also disable the other button if it exists and hasn't been submitted yet
+        // (prevent clicking both, but preserve state if other button was already submitted)
+        const otherBtnId = department === 'cloud' ? 'sn-ticket-btn' : 'cloud-ticket-btn';
+        const otherDepartment = department === 'cloud' ? 'sn' : 'cloud';
+        const otherBtn = document.getElementById(otherBtnId);
+        const otherBtnSubmitted = sessionStorage.getItem(`ticket_${otherDepartment}_submitted`);
+        
+        // Only disable the other button if:
+        // 1. It exists
+        // 2. It's currently enabled
+        // 3. It hasn't been submitted (no sessionStorage flag)
+        // 4. It doesn't show "Ticket Created" (which means it was already successfully submitted)
+        if (otherBtn && !otherBtn.disabled && otherBtnSubmitted !== 'true') {
+            // Check if button shows "Ticket Created" - if so, it was already successfully submitted
+            const btnText = otherBtn.textContent || otherBtn.innerText || '';
+            if (!btnText.includes('Ticket Created')) {
+                otherBtn.disabled = true;
+                otherBtn.style.opacity = '0.6';
+                otherBtn.style.cursor = 'not-allowed';
+            }
+        }
+    }
+    
+    // Manually submit the form
+    if (form && form.tagName === 'FORM') {
+        form.submit();
+    } else {
+        // Fallback: find form by ID
+        const formId = department === 'cloud' ? 'cloud-ticket-form' : 'sn-ticket-form';
+        const formElement = document.getElementById(formId);
+        if (formElement) {
+            formElement.submit();
+        }
+    }
+    
+    return false;
+}
+
+// Initialize button state on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const cloudBtn = document.getElementById('cloud-ticket-btn');
+    const snBtn = document.getElementById('sn-ticket-btn');
+    
+    // Store original HTML
+    if (cloudBtn) {
+        buttonOriginalHTML.cloud = cloudBtn.innerHTML;
+    }
+    if (snBtn) {
+        buttonOriginalHTML.sn = snBtn.innerHTML;
+    }
+    
+    // Check sessionStorage to see if form was just submitted
+    const cloudSubmitted = sessionStorage.getItem('ticket_cloud_submitted');
+    const snSubmitted = sessionStorage.getItem('ticket_sn_submitted');
+    
+    // Check for success messages indicating ticket was created
+    const messages = document.querySelectorAll('.alert-success');
+    let cloudSuccess = false;
+    let snSuccess = false;
+    
+    messages.forEach(function(alert) {
+        const messageText = alert.textContent || alert.innerText;
+        // Check if Cloud ticket was created
+        if (messageText.includes('Cloud') && messageText.includes('successfully')) {
+            cloudSuccess = true;
+            if (cloudBtn) {
+                // Always disable and update if success message found, even if already disabled
+                cloudBtn.disabled = true;
+                cloudBtn.style.opacity = '0.6';
+                cloudBtn.style.cursor = 'not-allowed';
+                cloudBtn.setAttribute('aria-disabled', 'true');
+                cloudBtn.innerHTML = '<i class="fas fa-check me-2"></i>Ticket Created';
+                // Mark as permanently disabled (don't clear sessionStorage, keep it disabled)
+                sessionStorage.setItem('ticket_cloud_completed', 'true');
+            }
+        }
+        // Check if SN ticket was created
+        if (messageText.includes('SN') && messageText.includes('successfully')) {
+            snSuccess = true;
+            if (snBtn) {
+                // Always disable and update if success message found, even if already disabled
+                snBtn.disabled = true;
+                snBtn.style.opacity = '0.6';
+                snBtn.style.cursor = 'not-allowed';
+                snBtn.setAttribute('aria-disabled', 'true');
+                snBtn.innerHTML = '<i class="fas fa-check me-2"></i>Ticket Created';
+                // Mark as permanently disabled (don't clear sessionStorage, keep it disabled)
+                sessionStorage.setItem('ticket_sn_completed', 'true');
+            }
+        }
+    });
+    
+    // Check if buttons were already completed (permanently disabled)
+    const cloudCompleted = sessionStorage.getItem('ticket_cloud_completed');
+    const snCompleted = sessionStorage.getItem('ticket_sn_completed');
+    
+    if (cloudCompleted === 'true' && cloudBtn) {
+        cloudBtn.disabled = true;
+        cloudBtn.style.opacity = '0.6';
+        cloudBtn.style.cursor = 'not-allowed';
+        cloudBtn.setAttribute('aria-disabled', 'true');
+        if (!cloudBtn.innerHTML.includes('Ticket Created')) {
+            cloudBtn.innerHTML = '<i class="fas fa-check me-2"></i>Ticket Created';
+        }
+    }
+    
+    if (snCompleted === 'true' && snBtn) {
+        snBtn.disabled = true;
+        snBtn.style.opacity = '0.6';
+        snBtn.style.cursor = 'not-allowed';
+        snBtn.setAttribute('aria-disabled', 'true');
+        if (!snBtn.innerHTML.includes('Ticket Created')) {
+            snBtn.innerHTML = '<i class="fas fa-check me-2"></i>Ticket Created';
+        }
+    }
+    
+    // If form was submitted but no success message yet, keep button disabled
+    // Only check this if the button wasn't already completed
+    if (cloudSubmitted === 'true' && !cloudSuccess && !cloudCompleted && cloudBtn) {
+        cloudBtn.disabled = true;
+        cloudBtn.style.opacity = '0.6';
+        cloudBtn.style.cursor = 'not-allowed';
+        cloudBtn.setAttribute('aria-disabled', 'true');
+        // Check if it's been more than 5 minutes (300000ms) - allow re-enable
+        const timestamp = parseInt(sessionStorage.getItem('ticket_cloud_timestamp') || '0');
+        if (Date.now() - timestamp > 300000) {
+            cloudBtn.disabled = false;
+            cloudBtn.style.opacity = '1';
+            cloudBtn.style.cursor = 'pointer';
+            cloudBtn.removeAttribute('aria-disabled');
+            sessionStorage.removeItem('ticket_cloud_submitted');
+            sessionStorage.removeItem('ticket_cloud_timestamp');
+        } else {
+            cloudBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creating...';
+        }
+    } else if (!cloudSubmitted && !cloudCompleted && cloudBtn && cloudBtn.disabled) {
+        // If button is disabled but wasn't submitted and isn't completed, re-enable it
+        // This handles the case where it was temporarily disabled by the other button
+        const btnText = cloudBtn.textContent || cloudBtn.innerText || '';
+        if ((btnText.includes('Creating...') || btnText.includes('Processing...')) && !btnText.includes('Ticket Created')) {
+            cloudBtn.disabled = false;
+            cloudBtn.style.opacity = '1';
+            cloudBtn.style.cursor = 'pointer';
+            cloudBtn.removeAttribute('aria-disabled');
+            if (buttonOriginalHTML.cloud) {
+                cloudBtn.innerHTML = buttonOriginalHTML.cloud;
+            }
+        }
+    }
+    
+    if (snSubmitted === 'true' && !snSuccess && !snCompleted && snBtn) {
+        snBtn.disabled = true;
+        snBtn.style.opacity = '0.6';
+        snBtn.style.cursor = 'not-allowed';
+        snBtn.setAttribute('aria-disabled', 'true');
+        // Check if it's been more than 5 minutes (300000ms) - allow re-enable
+        const timestamp = parseInt(sessionStorage.getItem('ticket_sn_timestamp') || '0');
+        if (Date.now() - timestamp > 300000) {
+            snBtn.disabled = false;
+            snBtn.style.opacity = '1';
+            snBtn.style.cursor = 'pointer';
+            snBtn.removeAttribute('aria-disabled');
+            sessionStorage.removeItem('ticket_sn_submitted');
+            sessionStorage.removeItem('ticket_sn_timestamp');
+        } else {
+            snBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creating...';
+        }
+    } else if (!snSubmitted && !snCompleted && snBtn && snBtn.disabled) {
+        // If button is disabled but wasn't submitted and isn't completed, re-enable it
+        // This handles the case where it was temporarily disabled by the other button
+        const btnText = snBtn.textContent || snBtn.innerText || '';
+        if ((btnText.includes('Creating...') || btnText.includes('Processing...')) && !btnText.includes('Ticket Created')) {
+            snBtn.disabled = false;
+            snBtn.style.opacity = '1';
+            snBtn.style.cursor = 'pointer';
+            snBtn.removeAttribute('aria-disabled');
+            if (buttonOriginalHTML.sn) {
+                snBtn.innerHTML = buttonOriginalHTML.sn;
+            }
+        }
+    }
+    
+    // Also check if buttons should be disabled based on cooldown/warning messages
+    const warnings = document.querySelectorAll('.alert-warning');
+    warnings.forEach(function(alert) {
+        const messageText = alert.textContent || alert.innerText;
+        // If there's a cooldown message, keep the button disabled
+        if (messageText.includes('wait') && messageText.includes('seconds')) {
+            if (messageText.includes('Cloud')) {
+                if (cloudBtn && !cloudBtn.disabled) {
+                    cloudBtn.disabled = true;
+                    cloudBtn.style.opacity = '0.6';
+                    cloudBtn.style.cursor = 'not-allowed';
+                }
+            }
+            if (messageText.includes('SN')) {
+                if (snBtn && !snBtn.disabled) {
+                    snBtn.disabled = true;
+                    snBtn.style.opacity = '0.6';
+                    snBtn.style.cursor = 'not-allowed';
+                }
+            }
+        }
+    });
+    
+    // Reset flags after a short delay to allow for page reload scenarios
+    setTimeout(function() {
+        ticketCreationInProgress.cloud = false;
+        ticketCreationInProgress.sn = false;
+    }, 1000);
+});
 
 </script>
 {% endblock body %}

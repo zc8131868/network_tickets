@@ -55,20 +55,6 @@ class IP_Application(models.Model):
         return f"{self.__class__.__name__}(location: {self.location} | usage: {self.usage} | number: {self.number} | subnet: {self.subnet} | description: {self.description})"
 
 
-class PA_Service(models.Model):
-    PROTOCOL_CHOICES = [
-        ('tcp', 'TCP'),
-        ('udp', 'UDP'),
-    ]
-    
-    protocol = models.CharField(max_length=10, choices=PROTOCOL_CHOICES, verbose_name='protocol')
-    port = models.CharField(max_length=100, unique=False, verbose_name='port')
-    create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
-
-    def __str__(self):
-        return f"{self.__class__.__name__}(protocol: {self.protocol} | port: {self.port})"
-
-
 class Vendor_VPN(models.Model):
     vendor_name = models.CharField(max_length=100, unique=True, verbose_name='vendor name')
     vendor_openid = models.CharField(max_length=100, unique=True, verbose_name='vendor openid')
@@ -105,3 +91,43 @@ class ITSR_Network(models.Model):
 
     def __str__(self):
         return f"{self.__class__.__name__}(itsr_ticket_number: {self.itsr_ticket_number} | requestor: {self.requestor} | handler: {self.handler} | ticket_status: {self.ticket_status} | itsr_status: {self.itsr_status})"
+
+
+
+class EOMS_Tickets(models.Model):
+    TICKET_STATUS_CHOICES = [
+        ('complete', 'Complete'),
+        ('incomplete', 'Incomplete'),
+    ]
+    
+    DEPARTMENT_CHOICES = [
+        ('Cloud', 'Cloud'),
+        ('SN', 'SN'),
+    ]
+
+    eoms_ticket_number = models.CharField(max_length=100, unique=True, verbose_name='eoms ticket number')
+    create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
+    ticket_status = models.CharField(max_length=100, choices=TICKET_STATUS_CHOICES, default='incomplete', verbose_name='ticket status')
+    requestor = models.CharField(max_length=100, blank=True, default='', verbose_name='requestor')
+    department = models.CharField(max_length=50, choices=DEPARTMENT_CHOICES, blank=True, default='', verbose_name='department')
+
+    def save(self, *args, **kwargs):
+        # Normalize requestor to lowercase for consistency
+        if self.requestor:
+            self.requestor = self.requestor.lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(eoms_ticket_number: {self.eoms_ticket_number} | create_datetime: {self.create_datetime} | description: {getattr(self, 'description', '')} | attachment: {getattr(self, 'attachment', '')})"
+
+# ---
+
+# To create this table in your MySQL database, run the following Django management commands from your project root:
+
+# 1. Make migrations for your app (replace 'auto_tickets' with your app name if different)
+#       python manage.py makemigrations auto_tickets
+
+# 2. Apply the migration to create the table in the database:
+#       python manage.py migrate auto_tickets
+
+# This will generate and run the SQL needed to create the EOMS_Tickets table in MySQL.

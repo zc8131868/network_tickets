@@ -39,6 +39,7 @@ from auto_tickets.views.create_vendor_vpn_account import create_vendor_vpn_accou
 from auto_tickets.views.download_vpn_sample import download_vpn_sample
 from auto_tickets.views.download_vpn_network_sample import download_vpn_network_sample
 from auto_tickets.views.delete_vendor_vpn_account import delete_vendor_vpn_account
+from auto_tickets.views.tickets_search import tickets_search
 from auto_tickets.views.itsr_close_api import (
     create_close_session_api,
     submit_credentials_api,
@@ -81,6 +82,7 @@ urlpatterns = [
     path('download_vpn_sample/', download_vpn_sample, name='download_vpn_sample'),
     path('download_vpn_network_sample/', download_vpn_network_sample, name='download_vpn_network_sample'),
     path('delete_vendor_vpn_account/', delete_vendor_vpn_account, name='delete_vendor_vpn_account'),
+    path('tickets_search/', tickets_search, name='tickets_search'),
     # ITSR Close API endpoints
     path('api/itsr_close/create_session/', create_close_session_api, name='itsr_close_create_session'),
     path('api/itsr_close/submit_credentials/', submit_credentials_api, name='itsr_close_submit_credentials'),

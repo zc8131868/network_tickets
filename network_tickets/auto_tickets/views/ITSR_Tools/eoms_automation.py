@@ -482,6 +482,66 @@ class EOmsClient:
         
         return response.json() if response.text else {}
     
+    def get_my_recent_instances(self, limit: int = 5) -> list:
+        """
+        获取当前用户最近创建的工作流实例
+        
+        参数:
+            limit: 返回的实例数量
+        
+        返回:
+            实例列表，每个实例包含 instId, title, createTime 等信息
+        """
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        # Try common EOMS endpoints for listing instances
+        endpoints = [
+            "/flow/instance/myApply",  # 我发起的
+            "/flow/instance/myList",   # 我的实例
+            "/flow/task/myApply",      # 我的申请
+        ]
+        
+        captured = self.home_headers if self.home_headers else self.headers
+        headers = {
+            "User-Agent": captured.get("user-agent", "Mozilla/5.0"),
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json; charset=UTF-8",
+        }
+        for key in ["authorization", "x-csrf-token", "x-requested-with", "referer", "origin"]:
+            if key in captured:
+                headers[key] = captured[key]
+        
+        session = requests.Session()
+        for name, value in self.cookies.items():
+            session.cookies.set(name, value)
+        
+        for endpoint in endpoints:
+            try:
+                url = f"{self.base_url}{endpoint}"
+                # Try POST with pagination params
+                payload = {
+                    "pageNum": 1,
+                    "pageSize": limit,
+                    "orderBy": "createTime",
+                    "orderType": "desc"
+                }
+                response = session.post(url, json=payload, headers=headers, verify=False)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("result") == 1 or data.get("success"):
+                        instances = data.get("data", {}).get("list", []) or data.get("data", []) or data.get("list", [])
+                        if instances:
+                            print(f"✅ 从 {endpoint} 获取到 {len(instances)} 个实例")
+                            return instances
+            except Exception as e:
+                print(f"⚠️ 尝试 {endpoint} 失败: {e}")
+                continue
+        
+        return []
+    
     def upload_file(self, file_path: str) -> dict:
         """
         上传文件到 EOMS 系统
@@ -724,7 +784,7 @@ DEFAULT_CONFIG = {
     "password": "Ericsson_5",
     "originator": "ZHENG Cheng",
     "originator_group": "System Operations Support",
-    "originator_contacts": "cczheng@hk.chinamobile.com",
+    "originator_contacts": "czheng@hk.chinamobile.com",
     "ticket_priority": "High",
     "configuration_type": "Internal Configuration",
     "network_operation_category": "B",
@@ -853,11 +913,15 @@ async def create_ticket(
     
     # 3. 上传附件（如果有）
     attachment_json = ""
+    # Track fileId for use as reference
+    file_id = None
+    
     if file_path:
         print(f"\n📤 正在上传附件...")
         upload_result = client.upload_file(file_path)
         
         if upload_result.get("success"):
+            file_id = upload_result.get("fileId")
             attachment_json = client.format_attachment(upload_result)
             print(f"✅ 附件上传成功: {attachment_json}")
         else:
@@ -893,9 +957,50 @@ async def create_ticket(
     
     # 6. 返回结果
     if response.get("result") == 1 or response.get("success"):
+        # 提取 instId（可能在 data 里，也可能在根层级）
+        inst_id = None
+        data_value = response.get("data")
+        
+        # Case 1: data is a dict - look for instId or similar fields
+        if isinstance(data_value, dict):
+            inst_id = data_value.get("instId") or data_value.get("id") or data_value.get("processInstanceId") or data_value.get("ticketNo") or data_value.get("orderNo")
+        # Case 2: data is a string or number that could be the instId directly
+        elif data_value and isinstance(data_value, (str, int)) and str(data_value).isdigit():
+            inst_id = str(data_value)
+        
+        # Check at root level if not found in data
+        if not inst_id:
+            inst_id = response.get("instId") or response.get("id") or response.get("processInstanceId") or response.get("ticketNo") or response.get("orderNo")
+        
+        # If no inst_id from response, use the fileId from attachment upload as reference
+        if not inst_id and file_id:
+            inst_id = file_id
+            print(f"✅ Using fileId as ticket reference: {inst_id}")
+
         print(f"\n✅ 工单创建成功!")
+        print(f"📋 Ticket ID: {inst_id}")
+        
+        # Save the ticket to database (using sync_to_async for async context)
+        try:
+            from asgiref.sync import sync_to_async
+            from auto_tickets.models import EOMS_Tickets
+            
+            @sync_to_async
+            def save_ticket():
+                EOMS_Tickets.objects.create(
+                    eoms_ticket_number=str(inst_id),
+                    department=target_department,
+                    requestor=_originator,
+                )
+            
+            await save_ticket()
+            print(f"💾 Ticket saved to database: {inst_id} (Department: {target_department}, Requestor: {_originator})")
+        except Exception as e:
+            print(f"⚠️ Failed to save ticket to database: {e}")
+
         return {
             "success": True,
+            "inst_id": inst_id,
             "message": response.get("message", "工单创建成功"),
             "response": response,
         }
@@ -904,6 +1009,7 @@ async def create_ticket(
         print(f"\n❌ 工单创建失败: {error_msg}")
         return {
             "success": False,
+            "inst_id": None,
             "error": error_msg,
             "response": response,
         }
