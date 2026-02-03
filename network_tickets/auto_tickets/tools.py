@@ -41,12 +41,34 @@ def get_location(ip_input):
                 # Skip invalid network configurations
                 continue
 
-        ip = ipaddress.ip_address(ip_input)
+        # Check if input is a subnet (contains '/') or just an IP address
+        if '/' in ip_input:
+            # Input is a subnet (e.g., "10.1.1.0/24")
+            try:
+                input_network = ipaddress.ip_network(ip_input, strict=False)
+                
+                # Check if the input subnet overlaps or matches any database network
+                for subnet in network_list:
+                    # Check if networks overlap (one contains the other or they intersect)
+                    if input_network.overlaps(subnet) or subnet.overlaps(input_network):
+                        # If input network is contained in or matches database network
+                        if input_network.subnet_of(subnet) or input_network == subnet:
+                            location = IPDB.objects.get(ip=subnet.network_address).location
+                            return location
+                        # If database network is contained in input network, still return the location
+                        elif subnet.subnet_of(input_network):
+                            location = IPDB.objects.get(ip=subnet.network_address).location
+                            return location
+            except (ValueError, ipaddress.AddressValueError):
+                return None
+        else:
+            # Input is just an IP address (e.g., "10.1.1.50")
+            ip = ipaddress.ip_address(ip_input)
 
-        for subnet in network_list:
-            if ip in subnet:
-                location = IPDB.objects.get(ip=subnet.network_address).location
-                return location
+            for subnet in network_list:
+                if ip in subnet:
+                    location = IPDB.objects.get(ip=subnet.network_address).location
+                    return location
         
     except Exception:
         return None 
@@ -75,19 +97,42 @@ def get_device(ip_input):
                 # Skip invalid network configurations
                 continue
 
-        ip = ipaddress.ip_address(ip_input)
+        # Check if input is a subnet (contains '/') or just an IP address
+        if '/' in ip_input:
+            # Input is a subnet (e.g., "10.1.1.0/24")
+            try:
+                input_network = ipaddress.ip_network(ip_input, strict=False)
+                
+                # Check if the input subnet overlaps or matches any database network
+                for subnet in network_list:
+                    # Check if networks overlap (one contains the other or they intersect)
+                    if input_network.overlaps(subnet) or subnet.overlaps(input_network):
+                        # If input network is contained in or matches database network
+                        if input_network.subnet_of(subnet) or input_network == subnet:
+                            device = IPDB.objects.get(ip=subnet.network_address).device
+                            return device
+                        # If database network is contained in input network, still return the device
+                        elif subnet.subnet_of(input_network):
+                            device = IPDB.objects.get(ip=subnet.network_address).device
+                            return device
+            except (ValueError, ipaddress.AddressValueError):
+                return None
+        else:
+            # Input is just an IP address (e.g., "10.1.1.50")
+            ip = ipaddress.ip_address(ip_input)
 
-        for subnet in network_list:
-            if ip in subnet:
-                device = IPDB.objects.get(ip=subnet.network_address).device
-                return device
+            for subnet in network_list:
+                if ip in subnet:
+                    device = IPDB.objects.get(ip=subnet.network_address).device
+                    return device
         
     except Exception:
         return None 
 
 
-# if __name__ == '__main__':
-#     print(get_device('10.0.40.44'))
+if __name__ == '__main__':
+    print(get_device('10.250.233.0/24'))
+    print(get_location('10.250.233.0/24'))
 
 
 
@@ -159,8 +204,15 @@ def _tickets_split_internal(source_ip, destination_ip):
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'
         elif source_location == 'PrivateCloud-TP' and destination_location == 'SN PCloud':
-            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN'    
-    ###############################################################
+            return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN' 
+        ###################VPN#############################################
+        elif source_location == 'SZ-VPN' and destination_location == 'NewPrivateCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+        elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+        elif source_location == 'SZ-VPN' and destination_location == 'SN PCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
+    #######################################################################
     elif source_device == 'DMZ SW01' and destination_device == 'M09-CORE-SW01':
         if source_location == 'SN OAM' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
@@ -173,8 +225,11 @@ def _tickets_split_internal(source_ip, destination_ip):
         ####################Taiping big data###############################
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
-    ###############################################################
-
+    #######################################################################
+    ##########################VPN##########################################
+        elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+    #######################################################################
     elif source_device == 'DMZ SW01' and destination_device == 'M09-EXT-CORE-SW1':
         if source_location == 'SN OAM' and destination_location == 'PrivateCloud-TP':
             return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
@@ -186,6 +241,10 @@ def _tickets_split_internal(source_ip, destination_ip):
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-TP':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud'
     ###############################################################
+    ##########################VPN##########################################
+        elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+    ##############################################################
     elif source_device == 'DMZ SW01' and destination_device == 'M09-INT-SW01':
         if source_location == 'SN OAM' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
@@ -197,6 +256,10 @@ def _tickets_split_internal(source_ip, destination_ip):
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
         ###############################################################
+        ##########################VPN##########################################
+        elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+    ##############################################################
     elif source_device == 'DMZ SW01' and destination_device == 'M09-SB-SW01':
         if source_location == 'SN OAM' and destination_location == 'South Base':
             return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to South Base. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)'
@@ -206,7 +269,10 @@ def _tickets_split_internal(source_ip, destination_ip):
         elif source_location == 'PrivateCloud-TP' and destination_location == 'South Base':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to South Base. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)EOMS-Cloud'
     ###############################################################
-
+    ##########################VPN########################################## 
+        elif source_location == 'SZ-VPN' and destination_location == 'South Base':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to South Base. Tickets contain: \n 1)ITSR\n 2)South Base (IT will provide support)'
+    ###############################################################
     elif source_device == 'DMZ SW01' and destination_device == 'PA':
         if source_location == 'SN OAM' and destination_location == 'South Base':
             return f'{source_ip} belongs to SN OAM, {destination_ip} belongs to South Base. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)'
@@ -220,6 +286,12 @@ def _tickets_split_internal(source_ip, destination_ip):
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to South Base. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)EOMS-Cloud'
         elif source_location == 'PrivateCloud-TP' and destination_location == 'SN PCloud':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)EOMS-Cloud'
+        ###############################################################
+        ##########################VPN##########################################
+        elif source_location == 'SZ-VPN' and destination_location == 'South Base':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to South Base. Tickets contain: \n 1)ITSR\n 2)South Base (IT will provide support)'
+        elif source_location == 'SZ-VPN' and destination_location == 'SN PCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to SN PCloud. Tickets contain: \n 1)ITSR\n 2)EOMS-Cloud\n 3)EOMS-SN'
         ###############################################################
         # elif source_location == 'AliCloud-Mylink' and destination_location == 'South Base':
         #     return f'{source_ip} belongs to AliCloud-Mylink, {destination_ip} belongs to South Base. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)South Base (IT will provide support)\n 4)AliCloud'
@@ -235,7 +307,10 @@ def _tickets_split_internal(source_ip, destination_ip):
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-GNC':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
         ###################################################################
-
+        ##########################VPN######################################
+        elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud-GNC':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to PrivateCloud-GNC. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
+        ###################################################################
     elif source_device == 'DMZ SW02' and destination_device == 'M09-CORE-SW01':
         if source_location == 'SN PCloud' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to SN PCloud, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)EOMS-SN \n 3)ITSR'
@@ -679,8 +754,8 @@ def tickets_split(source_ip, destination_ip, return_list=False):
     Split tickets based on source and destination IPs.
     
     Args:
-        source_ip: Source IP address
-        destination_ip: Destination IP address
+        source_ip: Source IP address or subnet
+        destination_ip: Destination IP address or subnet
         return_list: If True, returns a list of ticket names. If False (default), returns formatted string.
     
     Returns:
@@ -689,7 +764,7 @@ def tickets_split(source_ip, destination_ip, return_list=False):
         
     Note: The function always prints the result string to console, regardless of return_list parameter.
         
-    DMZ SW01: SN OAM, AliCloud,AliCloud-Mylink, PrivateCloud-TP
+    DMZ SW01: SN OAM, AliCloud,AliCloud-Mylink, PrivateCloud-TP, SZ-VPN
     DMZ SW02: NewPrivateCloud, PrivateCloud, SN PCloud
     M09-CORE-SW01: PrivateCloud
     M09-EXT-CORE-SW1: PrivateCloud-TP
@@ -711,10 +786,7 @@ def tickets_split(source_ip, destination_ip, return_list=False):
 
 
 
-if __name__ == '__main__':
-    source_ip = '10.0.170.1'
-    destination_ip = '10.0.61.16'
-    print(tickets_split(source_ip, destination_ip, return_list=True))
+
 
 
 def generate_subnet(network, num_ip_addresses, existing_subnets=None):
