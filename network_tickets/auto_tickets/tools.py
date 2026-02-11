@@ -131,8 +131,8 @@ def get_device(ip_input):
 
 
 if __name__ == '__main__':
-    print(get_device('10.250.233.0/24'))
-    print(get_location('10.250.233.0/24'))
+    print(get_device('10.1.192.22'))
+    print(get_location('10.1.192.2'))
 
 
 
@@ -697,7 +697,16 @@ def _tickets_split_internal(source_ip, destination_ip):
         elif source_location == 'PrivateCloud-TP' and destination_location == 'AliCloud-Mylink':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-SN \n 2)AliCloud\n 3)EOMS-Cloud'    
     ############################################################################################
-    
+     #####################################VPN#######################################
+        elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR\n 3)EOMS-SN'
+        elif source_location == 'SZ-VPN' and destination_location == 'SN OAM':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to SN OAM. Tickets contain: \n 1)EOMS-SN \n 2)ITSR'
+        elif source_location == 'SZ-VPN' and destination_location == 'AliCloud':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to AliCloud. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)AliCloud'
+        elif source_location == 'SZ-VPN' and destination_location == 'AliCloud-Mylink':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to AliCloud-Mylink. Tickets contain: \n 1)EOMS-SN \n 2)ITSR\n 3)AliCloud'    
+    ############################################################################################   
     
     elif source_device == 'DMZ SW02' and destination_device == 'DMZ SW02':
         if source_location == 'NewPrivateCloud' and destination_location == 'NewPrivateCloud':

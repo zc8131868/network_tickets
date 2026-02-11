@@ -86,7 +86,7 @@ def ticket_management(request):
                         })
                     
                     # Clean up files older than 6 months before saving new file
-                    deleted_count, error_count = cleanup_old_files(itsr_files_dir, retention_months=6)
+                    deleted_count, error_count = cleanup_old_files(itsr_files_dir, retention_months=2)
                     
                     # Generate filename: ticket_number_original_filename_timestamp.ext
                     file_extension = os.path.splitext(uploaded_file.name)[1]

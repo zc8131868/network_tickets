@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Script to create a sample.xlsx file entry in the DownloadFile model.
+Script to create an ITSR_Network_Ticket_Sample.xlsx file entry in the DownloadFile model.
 Run this script to set up the sample file for download.
 """
 
@@ -15,7 +15,7 @@ django.setup()
 from auto_tickets.models import DownloadFile
 
 def create_sample_file_entry():
-    """Create a DownloadFile entry for the sample.xlsx file"""
+    """Create a DownloadFile entry for the ITSR_Network_Ticket_Sample.xlsx file"""
     
     # Check if sample file already exists
     if DownloadFile.objects.filter(title='Sample').exists():
@@ -24,8 +24,8 @@ def create_sample_file_entry():
         print(f"Existing entry: ID={existing.id}, File={existing.file}")
         return
     
-    # Create a sample.xlsx file if it doesn't exist
-    sample_file_path = Path('media/download_files/sample.xlsx')
+    # Create an ITSR_Network_Ticket_Sample.xlsx file if it doesn't exist
+    sample_file_path = Path('media/download_files/ITSR_Network_Ticket_Sample.xlsx')
     sample_file_path.parent.mkdir(parents=True, exist_ok=True)
     
     if not sample_file_path.exists():
@@ -56,7 +56,7 @@ def create_sample_file_entry():
     try:
         download_file = DownloadFile.objects.create(
             title='Sample',
-            file='download_files/sample.xlsx'
+            file='download_files/ITSR_Network_Ticket_Sample.xlsx'
         )
         print(f"Created DownloadFile entry: ID={download_file.id}, Title={download_file.title}")
         print("Sample file is now available for download!")

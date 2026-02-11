@@ -11,16 +11,22 @@ def auto_vpnnet(request):
         form = AutoVpnNetForm(request.POST, request.FILES)
         if form.is_valid():
             uploaded_file = request.FILES['file']
+            print(f'[DEBUG] Processing file: {uploaded_file.name}')
             try:
                 wb = openpyxl.load_workbook(uploaded_file)
+                print(f'[DEBUG] Workbook loaded, active sheet: {wb.active.title}, max_row: {wb.active.max_row}')
                 result = create_vpn_access_policy_tool(wb)
                 
                 success_results = result.get('success', [])
                 error_messages = result.get('errors', [])
                 
-                # Prepare context
+                print(f'[DEBUG] Results - success: {len(success_results)}, errors: {len(error_messages)}')
+                
+                # Prepare context - always include form for re-upload
                 context = {
+                    'form': AutoVpnNetForm(),  # Fresh form for re-upload
                     'result_list': success_results,
+                    'processed': True,  # Flag to indicate processing was done
                 }
                 
                 # Add success message if there are successful results
@@ -30,11 +36,18 @@ def auto_vpnnet(request):
                 # Add error messages if there are any
                 if error_messages:
                     context['error_messages'] = error_messages
-                    context['has_errors'] = len(error_messages) > 0
+                    context['has_errors'] = True
+                
+                # If no results and no errors, show a warning message
+                if not success_results and not error_messages:
+                    context['warning_message'] = f'No valid data found in the uploaded file. Please ensure data starts from row 4 with all required columns (Ticket Number, Destination IP, Protocol, Destination Port, Vendor Name).'
                 
                 return render(request, 'auto_vpnnet.html', context)
             
             except Exception as e:
+                import traceback
+                print(f'[DEBUG] Exception: {str(e)}')
+                print(f'[DEBUG] Traceback: {traceback.format_exc()}')
                 # If there's an error processing the file, show the form with error
                 error_msg = f'Error processing file: {str(e)}'
                 form.add_error('file', error_msg)

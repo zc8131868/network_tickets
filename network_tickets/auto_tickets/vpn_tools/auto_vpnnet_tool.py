@@ -31,8 +31,6 @@ def create_vpn_access_policy_tool(wb):
         vendor_name_list = []
         protocol_list = []
 
-        print(f'row: {row}')
-
         ticket_number = sheet.cell(row=row, column=1).value
         dip = sheet.cell(row=row, column=2).value
         protocol = (sheet.cell(row=row, column=3).value)

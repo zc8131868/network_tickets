@@ -73,3 +73,6 @@ local_settings.py
 .venv/
 
 **/migrations/**
+
+# Per-session EOMS ticket files (transient, auto-cleaned)
+auto_tickets/views/EOMS_Ticket_file/session_files/

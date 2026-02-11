@@ -109,17 +109,49 @@
     
     /* Disabled ticket creation button styles */
     #cloud-ticket-btn:disabled,
-    #sn-ticket-btn:disabled {
+    #sn-ticket-btn:disabled,
+    #itsr-ticket-btn:disabled {
         opacity: 0.6 !important;
         cursor: not-allowed !important;
         pointer-events: none !important;
     }
     
     #cloud-ticket-btn .spinner-border,
-    #sn-ticket-btn .spinner-border {
+    #sn-ticket-btn .spinner-border,
+    #itsr-ticket-btn .spinner-border {
         width: 1rem;
         height: 1rem;
         border-width: 0.15em;
+    }
+    
+    /* ITSR Modal styles */
+    .itsr-step { display: none; }
+    .itsr-step.active { display: block; }
+    .itsr-modal-status {
+        text-align: center;
+        padding: 1.5rem 0;
+    }
+    .itsr-modal-status .spinner-border {
+        width: 2rem;
+        height: 2rem;
+    }
+    
+    /* ITSR modal: ensure it's above the backdrop when moved to body */
+    #itsrCredentialsModal {
+        z-index: 1060 !important;
+    }
+    #itsrCredentialsModal .modal-dialog {
+        z-index: 1061 !important;
+    }
+    #itsrCredentialsModal .modal-content {
+        z-index: 1062 !important;
+        pointer-events: auto !important;
+    }
+    #itsrCredentialsModal input,
+    #itsrCredentialsModal button,
+    #itsrCredentialsModal textarea,
+    #itsrCredentialsModal select {
+        pointer-events: auto !important;
     }
     </style>
 {% endblock head %}
@@ -192,13 +224,16 @@
                 <div class="card-body">
                     <div class="sample-download">
                         <div class="row align-items-center">
-                            <div class="col-md-8">
+                            <div class="col-md-6">
                                 <h5 class="mb-2"><i class="fas fa-download me-2"></i>Need a Sample File?</h5>
-                                <p class="text-muted mb-0">Download our sample Excel template to see the required format for bulk processing.</p>
+                                <p class="text-muted mb-0">Download a sample template. Both ITSR and VPN Network formats are supported and auto-detected.</p>
                             </div>
-                            <div class="col-md-4 text-end">
-                                <a href="{% url 'download_sample' %}" class="btn btn-success btn-lg">
-                                    <i class="fas fa-file-excel me-2"></i>Download Sample
+                            <div class="col-md-6 text-end">
+                                <a href="{% url 'download_sample' %}" class="btn btn-success btn-lg me-2 mb-2">
+                                    <i class="fas fa-file-excel me-2"></i>ITSR Network Sample
+                                </a>
+                                <a href="{% url 'download_vpn_network_sample' %}" class="btn btn-primary btn-lg mb-2">
+                                    <i class="fas fa-file-excel me-2"></i>ITSR VPN Network Sample
                                 </a>
                             </div>
                         </div>
@@ -289,6 +324,11 @@
                             </div>
                         </div>
                         
+                        <!-- CSRF token for AJAX requests -->
+                        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                        <!-- Debug: Server state (remove after debugging) -->
+                        <div id="server-debug" style="display:none;" data-cloud-created="{{ cloud_ticket_created|yesno:'true,false' }}" data-sn-created="{{ sn_ticket_created|yesno:'true,false' }}"></div>
+                        
                         <!-- Ticket Creation Buttons -->
                         {% if show_cloud_button or show_sn_button %}
                         <div class="alert alert-info mb-3" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 2px solid #3b82f6; border-radius: 1rem;">
@@ -296,6 +336,9 @@
                                 <div class="col-md-6">
                                     <h5 class="mb-1"><i class="fas fa-info-circle me-2"></i>EOMS Ticket Creation Available</h5>
                                     <p class="mb-0">EOMS ticket requests detected. Create tickets via Netcare.</p>
+                                    {% if staff_number %}
+                                    <p class="mb-0 mt-1"><i class="fas fa-user me-1"></i><strong>Staff Number:</strong> {{ staff_number }}</p>
+                                    {% endif %}
                                 </div>
                                 <div class="col-md-6 text-end">
                                     {% if show_cloud_button %}
@@ -303,9 +346,15 @@
                                         {% csrf_token %}
                                         <input type="hidden" name="create_ticket" value="1">
                                         <input type="hidden" name="target_department" value="Cloud">
+                                        {% if cloud_ticket_created %}
+                                        <button type="button" id="cloud-ticket-btn" class="btn btn-primary btn-lg me-2 mb-2" style="width: 250px; opacity: 0.6; cursor: not-allowed;" disabled data-server-completed="true">
+                                            <i class="fas fa-check me-2"></i>Ticket Created
+                                        </button>
+                                        {% else %}
                                         <button type="submit" id="cloud-ticket-btn" class="btn btn-primary btn-lg me-2 mb-2" style="width: 250px;">
                                             <i class="fas fa-cloud me-2"></i>Raise Tickets to EOMS Cloud
                                         </button>
+                                        {% endif %}
                                     </form>
                                     {% endif %}
                                     {% if show_sn_button %}
@@ -313,9 +362,15 @@
                                         {% csrf_token %}
                                         <input type="hidden" name="create_ticket" value="1">
                                         <input type="hidden" name="target_department" value="SN">
+                                        {% if sn_ticket_created %}
+                                        <button type="button" id="sn-ticket-btn" class="btn btn-success btn-lg mb-2" style="width: 250px; opacity: 0.6; cursor: not-allowed;" disabled data-server-completed="true">
+                                            <i class="fas fa-check me-2"></i>Ticket Created
+                                        </button>
+                                        {% else %}
                                         <button type="submit" id="sn-ticket-btn" class="btn btn-success btn-lg mb-2" style="width: 250px;">
                                             <i class="fas fa-network-wired me-2"></i>Raise Tickets to EOMS SN
                                         </button>
+                                        {% endif %}
                                     </form>
                                     {% endif %}
                                 </div>
@@ -323,6 +378,32 @@
                         </div>
                         {% endif %}
                         
+                        <!-- ITSR Ticket Creation Section -->
+                        {% if show_itsr_button %}
+                        <div class="alert alert-warning mb-3" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 1rem;">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h5 class="mb-1"><i class="fas fa-ticket-alt me-2"></i>ITSR Ticket Creation Available</h5>
+                                    <p class="mb-0">ITSR ticket requirement detected. Login with your credentials to create.</p>
+                                    {% if staff_number %}
+                                    <p class="mb-0 mt-1"><i class="fas fa-user me-1"></i><strong>Staff Number:</strong> {{ staff_number }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    {% if itsr_ticket_created %}
+                                    <button type="button" id="itsr-ticket-btn" class="btn btn-warning btn-lg mb-2" style="width: 280px; opacity: 0.6; cursor: not-allowed;" disabled data-server-completed="true">
+                                        <i class="fas fa-check me-2"></i>ITSR Ticket Created
+                                    </button>
+                                    {% else %}
+                                    <button type="button" id="itsr-ticket-btn" class="btn btn-warning btn-lg mb-2" style="width: 280px;" onclick="openItsrModal();">
+                                        <i class="fas fa-ticket-alt me-2"></i>Raise ITSR Ticket
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
                         {% if messages %}
                             {% for message in messages %}
                                 <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
@@ -360,24 +441,124 @@
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-6">
-                            <h6><i class="fas fa-file-excel text-success me-2"></i>Excel Format Requirements</h6>
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-file-excel text-success me-2"></i>ITSR Format (Auto-detected)</h6>
                             <ul class="list-unstyled">
-                                <li><i class="fas fa-check text-success me-2"></i>Use the provided sample template</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Include all required columns</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Save as .xlsx format</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Col C: Source IP</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Col E: Destination IP</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Col F: Port, Col G: Protocol</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Col H: Staff Number</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Data starts from row 4</li>
                             </ul>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <h6><i class="fas fa-shield-alt text-primary me-2"></i>VPN Network Format (Auto-detected)</h6>
+                            <ul class="list-unstyled">
+                                <li><i class="fas fa-check text-primary me-2"></i>Col A: Ticket No.</li>
+                                <li><i class="fas fa-check text-primary me-2"></i>Col B: Destination IP</li>
+                                <li><i class="fas fa-check text-primary me-2"></i>Col C: Protocol, Col D: Port</li>
+                                <li><i class="fas fa-check text-primary me-2"></i>Col F: Staff Number</li>
+                                <li><i class="fas fa-check text-primary me-2"></i>Data starts from row 4 (row 3 is example)</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
                             <h6><i class="fas fa-lightbulb text-warning me-2"></i>Processing Tips</h6>
                             <ul class="list-unstyled">
-                                <li><i class="fas fa-arrow-right text-info me-2"></i>Each row represents one ticket</li>
-                                <li><i class="fas fa-arrow-right text-info me-2"></i>Results are displayed after upload</li>
-                                <li><i class="fas fa-arrow-right text-info me-2"></i>Copy results for further use</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>File format is auto-detected</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>EOMS Cloud/SN tickets are detected</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Raise EOMS tickets with one click</li>
+                                <li><i class="fas fa-arrow-right text-info me-2"></i>Ticket number & staff number displayed</li>
                                 <li><i class="fas fa-exclamation-triangle text-danger me-2"></i>Errors are shown if processing fails</li>
-                                <li><i class="fas fa-redo text-warning me-2"></i>Use "Try Again" to retry after errors</li>
                             </ul>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ITSR Credentials Modal -->
+<div class="modal fade" id="itsrCredentialsModal" tabindex="-1" aria-labelledby="itsrModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 1rem; border: 2px solid #f59e0b;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 1rem 1rem 0 0;">
+                <h5 class="modal-title" id="itsrModalLabel"><i class="fas fa-ticket-alt me-2"></i>ITSR Ticket Creation</h5>
+                <button type="button" class="btn-close" id="itsr-modal-close-btn" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: Credentials -->
+                <div id="itsr-step-credentials" class="itsr-step active">
+                    <p class="text-muted mb-3">Enter your credentials to create the ITSR ticket.</p>
+                    <div class="mb-3">
+                        <label for="itsr-username" class="form-label fw-bold">Username</label>
+                        <input type="text" class="form-control" id="itsr-username" placeholder="e.g. PY0121" autocomplete="username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="itsr-password" class="form-label fw-bold">Password</label>
+                        <input type="password" class="form-control" id="itsr-password" placeholder="Password" autocomplete="current-password">
+                    </div>
+                    <div id="itsr-credentials-error" class="alert alert-danger d-none" role="alert"></div>
+                    <button type="button" class="btn btn-warning w-100 btn-lg" onclick="submitItsrCredentials();">
+                        <i class="fas fa-sign-in-alt me-2"></i>Login &amp; Create Ticket
+                    </button>
+                </div>
+
+                <!-- Step 2: Logging in -->
+                <div id="itsr-step-logging-in" class="itsr-step">
+                    <div class="itsr-modal-status">
+                        <div class="spinner-border text-warning mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 id="itsr-logging-in-msg">Logging in...</h5>
+                        <p class="text-muted">This may take up to 2 minutes. Please wait.</p>
+                    </div>
+                </div>
+
+                <!-- Step 3: SMS -->
+                <div id="itsr-step-sms" class="itsr-step">
+                    <div class="alert alert-info">
+                        <i class="fas fa-sms me-2"></i>SMS verification code has been sent to your phone.
+                    </div>
+                    <div class="mb-3">
+                        <label for="itsr-sms-code" class="form-label fw-bold">SMS Verification Code</label>
+                        <input type="text" class="form-control form-control-lg text-center" id="itsr-sms-code" placeholder="6-digit code" maxlength="6" style="letter-spacing: 0.5em; font-size: 1.5rem;">
+                    </div>
+                    <div id="itsr-sms-error" class="alert alert-danger d-none" role="alert"></div>
+                    <button type="button" class="btn btn-warning w-100 btn-lg" onclick="submitItsrSms();">
+                        <i class="fas fa-paper-plane me-2"></i>Submit Code &amp; Create Ticket
+                    </button>
+                </div>
+
+                <!-- Step 4: Creating ticket -->
+                <div id="itsr-step-creating" class="itsr-step">
+                    <div class="itsr-modal-status">
+                        <div class="spinner-border text-warning mb-3" role="status">
+                            <span class="visually-hidden">Creating...</span>
+                        </div>
+                        <h5>Creating ITSR ticket...</h5>
+                        <p class="text-muted">Submitting request. Please wait.</p>
+                    </div>
+                </div>
+
+                <!-- Step 5: Success -->
+                <div id="itsr-step-success" class="itsr-step">
+                    <div class="itsr-modal-status">
+                        <i class="fas fa-check-circle text-success mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="text-success">ITSR Ticket Created Successfully!</h5>
+                        <div id="itsr-success-details" class="mt-3 text-start"></div>
+                    </div>
+                </div>
+
+                <!-- Step 6: Error -->
+                <div id="itsr-step-error" class="itsr-step">
+                    <div class="itsr-modal-status">
+                        <i class="fas fa-times-circle text-danger mb-3" style="font-size: 3rem;"></i>
+                        <h5 class="text-danger">Ticket Creation Failed</h5>
+                        <div id="itsr-error-details" class="alert alert-danger mt-3"></div>
+                        <button type="button" class="btn btn-outline-warning mt-2" onclick="resetItsrModal();">
+                            <i class="fas fa-redo me-2"></i>Try Again
+                        </button>
                     </div>
                 </div>
             </div>
@@ -582,28 +763,24 @@ let buttonOriginalHTML = {
 };
 
 function handleTicketCreation(event, department) {
-    // Get button and form
+    // Prevent default form submission - we'll use AJAX instead
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Get button
     const btnId = department === 'cloud' ? 'cloud-ticket-btn' : 'sn-ticket-btn';
     const btn = document.getElementById(btnId);
-    const form = event.target.closest('form') || event.target.form;
     
-    // If button is already disabled, prevent submission
+    // If button is already disabled, prevent action
     if (btn && btn.disabled) {
-        event.preventDefault();
-        event.stopPropagation();
         return false;
     }
     
-    // Prevent default form submission if already in progress
+    // Prevent if already in progress
     if (ticketCreationInProgress[department]) {
-        event.preventDefault();
-        event.stopPropagation();
         alert('⏳ Ticket creation is already in progress. Please wait...');
         return false;
     }
-    
-    // Prevent default form submission to show confirmation first
-    event.preventDefault();
     
     // Store original HTML if not already stored
     if (btn && !buttonOriginalHTML[department]) {
@@ -615,63 +792,215 @@ function handleTicketCreation(event, department) {
     const confirmed = confirm('Are you sure you want to create a ticket for ' + deptName + ' department?');
     
     if (!confirmed) {
-        // User cancelled - do nothing, button remains enabled
         return false;
     }
     
-    // User confirmed - disable button and submit form
+    // User confirmed - disable button and start AJAX request
     ticketCreationInProgress[department] = true;
     
     if (btn) {
-        // Disable button immediately
         btn.disabled = true;
         btn.style.opacity = '0.6';
         btn.style.cursor = 'not-allowed';
         btn.setAttribute('aria-disabled', 'true');
-        
-        // Show creating state
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creating...';
+    }
+    
+    // Disable the other button to prevent creating multiple tickets at the same time
+    const otherDept = department === 'cloud' ? 'sn' : 'cloud';
+    const otherBtn = document.getElementById(`${otherDept}-ticket-btn`);
+    if (otherBtn && !otherBtn.disabled) {
+        otherBtn.disabled = true;
+        otherBtn.style.opacity = '0.6';
+        otherBtn.style.cursor = 'not-allowed';
+        otherBtn.setAttribute('data-temp-disabled', 'true');
+    }
+    
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // Start ticket creation via AJAX
+    fetch('/api/create_eoms_ticket/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-CSRFToken': csrfToken,
+        },
+        body: `target_department=${deptName}`,
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.task_id) {
+            // Start polling for status
+            pollTicketStatus(data.task_id, department, btn);
+        } else {
+            // Error starting task
+            handleTicketError(department, btn, data.error || 'Failed to start ticket creation');
+        }
+    })
+    .catch(error => {
+        handleTicketError(department, btn, 'Network error: ' + error.message);
+    });
+    
+    return false;
+}
+
+function pollTicketStatus(taskId, department, btn) {
+    const pollInterval = 3000; // Poll every 3 seconds
+    const maxPolls = 120; // Max 6 minutes of polling
+    let pollCount = 0;
+    
+    function checkStatus() {
+        pollCount++;
         
-        // Store in sessionStorage to keep button disabled after page reload
-        sessionStorage.setItem(`ticket_${department}_submitted`, 'true');
-        sessionStorage.setItem(`ticket_${department}_timestamp`, Date.now().toString());
+        if (pollCount > maxPolls) {
+            handleTicketError(department, btn, 'Ticket creation timed out. Please check EOMS directly.');
+            return;
+        }
         
-        // Also disable the other button if it exists and hasn't been submitted yet
-        // (prevent clicking both, but preserve state if other button was already submitted)
-        const otherBtnId = department === 'cloud' ? 'sn-ticket-btn' : 'cloud-ticket-btn';
-        const otherDepartment = department === 'cloud' ? 'sn' : 'cloud';
-        const otherBtn = document.getElementById(otherBtnId);
-        const otherBtnSubmitted = sessionStorage.getItem(`ticket_${otherDepartment}_submitted`);
-        
-        // Only disable the other button if:
-        // 1. It exists
-        // 2. It's currently enabled
-        // 3. It hasn't been submitted (no sessionStorage flag)
-        // 4. It doesn't show "Ticket Created" (which means it was already successfully submitted)
-        if (otherBtn && !otherBtn.disabled && otherBtnSubmitted !== 'true') {
-            // Check if button shows "Ticket Created" - if so, it was already successfully submitted
-            const btnText = otherBtn.textContent || otherBtn.innerText || '';
-            if (!btnText.includes('Ticket Created')) {
-                otherBtn.disabled = true;
-                otherBtn.style.opacity = '0.6';
-                otherBtn.style.cursor = 'not-allowed';
+        fetch(`/api/check_ticket_status/${taskId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.task) {
+                const task = data.task;
+                
+                if (task.status === 'processing') {
+                    // Still processing, continue polling
+                    setTimeout(checkStatus, pollInterval);
+                } else if (task.status === 'completed') {
+                    if (task.success) {
+                        // Success! Pass ticket ID and requestor to handler
+                        handleTicketSuccess(department, btn, task.inst_id || task.ticket_id, task.requestor);
+                    } else {
+                        // Ticket creation failed
+                        handleTicketError(department, btn, task.error || 'Ticket creation failed');
+                    }
+                } else if (task.status === 'error') {
+                    handleTicketError(department, btn, task.error || 'Unknown error');
+                }
+            } else {
+                // Polling error, retry
+                setTimeout(checkStatus, pollInterval);
+            }
+        })
+        .catch(error => {
+            // Network error, retry a few times
+            if (pollCount < 5) {
+                setTimeout(checkStatus, pollInterval);
+            } else {
+                handleTicketError(department, btn, 'Lost connection to server. Please refresh and check EOMS.');
+            }
+        });
+    }
+    
+    // Start polling after a short delay
+    setTimeout(checkStatus, pollInterval);
+}
+
+function handleTicketSuccess(department, btn, ticketId, requestor) {
+    ticketCreationInProgress[department] = false;
+    
+    if (btn) {
+        btn.innerHTML = '<i class="fas fa-check me-2"></i>Ticket Created';
+        btn.classList.remove('btn-primary', 'btn-success');
+        btn.classList.add('btn-secondary');
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.setAttribute('data-server-completed', 'true');
+    }
+    
+    // Clear sessionStorage flags
+    sessionStorage.removeItem(`ticket_${department}_submitted`);
+    sessionStorage.removeItem(`ticket_${department}_timestamp`);
+    sessionStorage.setItem(`ticket_${department}_completed`, 'true');
+    
+    // Show success message with ticket ID and requestor (persistent - no auto-dismiss)
+    const deptName = department === 'cloud' ? 'Cloud' : 'SN';
+    let successMsg = `✅ Ticket created successfully for ${deptName} department!`;
+    if (ticketId) {
+        successMsg += `<br><strong>Ticket ID: ${ticketId}</strong>`;
+    }
+    if (requestor) {
+        successMsg += `<br><strong>Requestor: ${requestor}</strong>`;
+    }
+    showAlert('success', successMsg, false);  // false = don't auto-dismiss
+    
+    // Re-enable other button if it was temporarily disabled (not completed)
+    const otherDept = department === 'cloud' ? 'sn' : 'cloud';
+    const otherBtn = document.getElementById(`${otherDept}-ticket-btn`);
+    if (otherBtn && otherBtn.getAttribute('data-temp-disabled') === 'true') {
+        // Only re-enable if it was temporarily disabled and not already completed
+        if (!sessionStorage.getItem(`ticket_${otherDept}_completed`)) {
+            otherBtn.disabled = false;
+            otherBtn.style.opacity = '1';
+            otherBtn.style.cursor = 'pointer';
+            otherBtn.removeAttribute('data-temp-disabled');
+            if (buttonOriginalHTML[otherDept]) {
+                otherBtn.innerHTML = buttonOriginalHTML[otherDept];
             }
         }
     }
+}
+
+function handleTicketError(department, btn, errorMessage) {
+    ticketCreationInProgress[department] = false;
     
-    // Manually submit the form
-    if (form && form.tagName === 'FORM') {
-        form.submit();
-    } else {
-        // Fallback: find form by ID
-        const formId = department === 'cloud' ? 'cloud-ticket-form' : 'sn-ticket-form';
-        const formElement = document.getElementById(formId);
-        if (formElement) {
-            formElement.submit();
+    if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+        btn.removeAttribute('aria-disabled');
+        if (buttonOriginalHTML[department]) {
+            btn.innerHTML = buttonOriginalHTML[department];
         }
     }
     
-    return false;
+    // Clear sessionStorage
+    sessionStorage.removeItem(`ticket_${department}_submitted`);
+    sessionStorage.removeItem(`ticket_${department}_timestamp`);
+    
+    // Show error message (persistent - no auto-dismiss)
+    showAlert('danger', `❌ Error: ${errorMessage}`, false);
+    
+    // Re-enable other button if it was temporarily disabled
+    const otherDept = department === 'cloud' ? 'sn' : 'cloud';
+    const otherBtn = document.getElementById(`${otherDept}-ticket-btn`);
+    if (otherBtn && otherBtn.getAttribute('data-temp-disabled') === 'true') {
+        if (!sessionStorage.getItem(`ticket_${otherDept}_completed`)) {
+            otherBtn.disabled = false;
+            otherBtn.style.opacity = '1';
+            otherBtn.style.cursor = 'pointer';
+            otherBtn.removeAttribute('data-temp-disabled');
+            if (buttonOriginalHTML[otherDept]) {
+                otherBtn.innerHTML = buttonOriginalHTML[otherDept];
+            }
+        }
+    }
+}
+
+function showAlert(type, message, autoDismiss = true) {
+    // Create alert element
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.setAttribute('role', 'alert');
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    // Insert at the top of the results container or before the EOMS section
+    const container = document.querySelector('.results-container') || document.querySelector('.alert-info');
+    if (container && container.parentNode) {
+        container.parentNode.insertBefore(alertDiv, container);
+    }
+    
+    // Only auto-dismiss if requested (default: true for backwards compatibility)
+    if (autoDismiss) {
+        setTimeout(() => {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 150);
+        }, 10000);
+    }
 }
 
 // Initialize button state on page load
@@ -679,11 +1008,36 @@ document.addEventListener('DOMContentLoaded', function() {
     const cloudBtn = document.getElementById('cloud-ticket-btn');
     const snBtn = document.getElementById('sn-ticket-btn');
     
+    // Debug: Log server state
+    const debugEl = document.getElementById('server-debug');
+    if (debugEl) {
+        console.log('[DEBUG] Server state - cloud_ticket_created:', debugEl.getAttribute('data-cloud-created'));
+        console.log('[DEBUG] Server state - sn_ticket_created:', debugEl.getAttribute('data-sn-created'));
+    }
+    console.log('[DEBUG] Cloud button data-server-completed:', cloudBtn ? cloudBtn.getAttribute('data-server-completed') : 'no button');
+    console.log('[DEBUG] SN button data-server-completed:', snBtn ? snBtn.getAttribute('data-server-completed') : 'no button');
+    
+    // Check if server has already marked buttons as completed (takes priority over JS state)
+    const cloudServerCompleted = cloudBtn && cloudBtn.getAttribute('data-server-completed') === 'true';
+    const snServerCompleted = snBtn && snBtn.getAttribute('data-server-completed') === 'true';
+    
+    // If server marked as completed, clear sessionStorage and skip JS logic for that button
+    if (cloudServerCompleted) {
+        sessionStorage.removeItem('ticket_cloud_submitted');
+        sessionStorage.removeItem('ticket_cloud_timestamp');
+        sessionStorage.setItem('ticket_cloud_completed', 'true');
+    }
+    if (snServerCompleted) {
+        sessionStorage.removeItem('ticket_sn_submitted');
+        sessionStorage.removeItem('ticket_sn_timestamp');
+        sessionStorage.setItem('ticket_sn_completed', 'true');
+    }
+    
     // Store original HTML
-    if (cloudBtn) {
+    if (cloudBtn && !cloudServerCompleted) {
         buttonOriginalHTML.cloud = cloudBtn.innerHTML;
     }
-    if (snBtn) {
+    if (snBtn && !snServerCompleted) {
         buttonOriginalHTML.sn = snBtn.innerHTML;
     }
     
@@ -695,6 +1049,31 @@ document.addEventListener('DOMContentLoaded', function() {
     const messages = document.querySelectorAll('.alert-success');
     let cloudSuccess = false;
     let snSuccess = false;
+    
+    // Check for error messages - if there's an error, clear sessionStorage to allow retry
+    const errorMessages = document.querySelectorAll('.alert-danger');
+    let cloudError = false;
+    let snError = false;
+    
+    errorMessages.forEach(function(alert) {
+        const messageText = alert.textContent || alert.innerText;
+        // Check if Cloud ticket failed
+        if (messageText.includes('Cloud') && (messageText.includes('Failed') || messageText.includes('Error'))) {
+            cloudError = true;
+            // Clear sessionStorage to allow retry
+            sessionStorage.removeItem('ticket_cloud_submitted');
+            sessionStorage.removeItem('ticket_cloud_timestamp');
+            ticketCreationInProgress.cloud = false;
+        }
+        // Check if SN ticket failed
+        if (messageText.includes('SN') && (messageText.includes('Failed') || messageText.includes('Error'))) {
+            snError = true;
+            // Clear sessionStorage to allow retry
+            sessionStorage.removeItem('ticket_sn_submitted');
+            sessionStorage.removeItem('ticket_sn_timestamp');
+            ticketCreationInProgress.sn = false;
+        }
+    });
     
     messages.forEach(function(alert) {
         const messageText = alert.textContent || alert.innerText;
@@ -753,8 +1132,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // If form was submitted but no success message yet, keep button disabled
-    // Only check this if the button wasn't already completed
-    if (cloudSubmitted === 'true' && !cloudSuccess && !cloudCompleted && cloudBtn) {
+    // Only check this if the button wasn't already completed AND there's no error AND server didn't mark as completed
+    if (cloudSubmitted === 'true' && !cloudSuccess && !cloudCompleted && !cloudError && !cloudServerCompleted && cloudBtn) {
         cloudBtn.disabled = true;
         cloudBtn.style.opacity = '0.6';
         cloudBtn.style.cursor = 'not-allowed';
@@ -771,9 +1150,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             cloudBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creating...';
         }
-    } else if (!cloudSubmitted && !cloudCompleted && cloudBtn && cloudBtn.disabled) {
-        // If button is disabled but wasn't submitted and isn't completed, re-enable it
-        // This handles the case where it was temporarily disabled by the other button
+    } else if ((!cloudSubmitted || cloudError) && !cloudCompleted && !cloudServerCompleted && cloudBtn && cloudBtn.disabled) {
+        // If button is disabled but wasn't submitted (or had an error) and isn't completed, re-enable it
+        // This handles the case where it was temporarily disabled by the other button or had an error
         const btnText = cloudBtn.textContent || cloudBtn.innerText || '';
         if ((btnText.includes('Creating...') || btnText.includes('Processing...')) && !btnText.includes('Ticket Created')) {
             cloudBtn.disabled = false;
@@ -786,7 +1165,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    if (snSubmitted === 'true' && !snSuccess && !snCompleted && snBtn) {
+    if (snSubmitted === 'true' && !snSuccess && !snCompleted && !snError && !snServerCompleted && snBtn) {
         snBtn.disabled = true;
         snBtn.style.opacity = '0.6';
         snBtn.style.cursor = 'not-allowed';
@@ -803,9 +1182,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             snBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creating...';
         }
-    } else if (!snSubmitted && !snCompleted && snBtn && snBtn.disabled) {
-        // If button is disabled but wasn't submitted and isn't completed, re-enable it
-        // This handles the case where it was temporarily disabled by the other button
+    } else if ((!snSubmitted || snError) && !snCompleted && !snServerCompleted && snBtn && snBtn.disabled) {
+        // If button is disabled but wasn't submitted (or had an error) and isn't completed, re-enable it
+        // This handles the case where it was temporarily disabled by the other button or had an error
         const btnText = snBtn.textContent || snBtn.innerText || '';
         if ((btnText.includes('Creating...') || btnText.includes('Processing...')) && !btnText.includes('Ticket Created')) {
             snBtn.disabled = false;
@@ -846,7 +1225,229 @@ document.addEventListener('DOMContentLoaded', function() {
         ticketCreationInProgress.cloud = false;
         ticketCreationInProgress.sn = false;
     }, 1000);
+
+    // ITSR button: check server-side completed state
+    const itsrBtn = document.getElementById('itsr-ticket-btn');
+    const itsrServerCompleted = itsrBtn && itsrBtn.getAttribute('data-server-completed') === 'true';
+    if (itsrServerCompleted) {
+        sessionStorage.setItem('ticket_itsr_completed', 'true');
+    }
+    const itsrCompleted = sessionStorage.getItem('ticket_itsr_completed');
+    if (itsrCompleted === 'true' && itsrBtn) {
+        itsrBtn.disabled = true;
+        itsrBtn.style.opacity = '0.6';
+        itsrBtn.style.cursor = 'not-allowed';
+        if (!itsrBtn.innerHTML.includes('ITSR Ticket Created')) {
+            itsrBtn.innerHTML = '<i class="fas fa-check me-2"></i>ITSR Ticket Created';
+        }
+    }
 });
+
+
+// ============================================================
+// ITSR Ticket Creation – Modal + AJAX flow
+// ============================================================
+
+let itsrSessionId = null;
+let itsrModalInstance = null;
+let _itsrModalMovedToBody = false;
+
+function _showItsrStep(stepId) {
+    document.querySelectorAll('.itsr-step').forEach(el => el.classList.remove('active'));
+    const step = document.getElementById(stepId);
+    if (step) step.classList.add('active');
+}
+
+function getCsrfToken() {
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
+function openItsrModal() {
+    var btn = document.getElementById('itsr-ticket-btn');
+    if (btn && btn.disabled) return;
+    resetItsrModal();
+
+    var modal = document.getElementById('itsrCredentialsModal');
+
+    // KEY FIX: Move the modal to document.body so it shares the same
+    // stacking context as Bootstrap's backdrop. The base template's
+    // .main-content has "position: relative; z-index: 1;" which creates
+    // a stacking context that traps the modal below the backdrop.
+    if (!_itsrModalMovedToBody) {
+        document.body.appendChild(modal);
+        _itsrModalMovedToBody = true;
+    }
+
+    // Dispose any existing modal instance to avoid conflicts
+    var existing = bootstrap.Modal.getInstance(modal);
+    if (existing) {
+        existing.dispose();
+    }
+
+    itsrModalInstance = new bootstrap.Modal(modal, {
+        backdrop: true,
+        keyboard: true,
+        focus: true
+    });
+    itsrModalInstance.show();
+
+    // Focus on username after modal is fully shown
+    modal.addEventListener('shown.bs.modal', function onShown() {
+        var u = document.getElementById('itsr-username');
+        if (u) u.focus();
+        modal.removeEventListener('shown.bs.modal', onShown);
+    });
+}
+
+function resetItsrModal() {
+    _showItsrStep('itsr-step-credentials');
+
+    // Clear input fields
+    ['itsr-username', 'itsr-password', 'itsr-sms-code'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.value = '';
+            el.disabled = false;
+            el.removeAttribute('disabled');
+            el.readOnly = false;
+            el.removeAttribute('readonly');
+        }
+    });
+
+    document.getElementById('itsr-credentials-error').classList.add('d-none');
+    document.getElementById('itsr-sms-error').classList.add('d-none');
+
+    // Re-enable close button
+    var closeBtn = document.getElementById('itsr-modal-close-btn');
+    if (closeBtn) closeBtn.style.display = '';
+}
+
+function submitItsrCredentials() {
+    const username = document.getElementById('itsr-username').value.trim();
+    const password = document.getElementById('itsr-password').value.trim();
+    const errEl = document.getElementById('itsr-credentials-error');
+
+    if (!username || !password) {
+        errEl.textContent = 'Please enter both username and password.';
+        errEl.classList.remove('d-none');
+        return;
+    }
+    errEl.classList.add('d-none');
+
+    // Hide close button during processing
+    const closeBtn = document.getElementById('itsr-modal-close-btn');
+    if (closeBtn) closeBtn.style.display = 'none';
+
+    _showItsrStep('itsr-step-logging-in');
+
+    fetch('/api/create_itsr_ticket/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ username: username, password: password }),
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.success) {
+            if (data.needs_sms) {
+                // SMS required
+                itsrSessionId = data.session_id;
+                _showItsrStep('itsr-step-sms');
+                // Re-show close button for SMS step
+                if (closeBtn) closeBtn.style.display = '';
+            } else {
+                // No SMS, ticket created directly
+                handleItsrSuccess(data);
+            }
+        } else {
+            handleItsrError(data.error || 'Login failed.');
+        }
+    })
+    .catch(err => {
+        handleItsrError('Network error: ' + err.message);
+    });
+}
+
+function submitItsrSms() {
+    const smsCode = document.getElementById('itsr-sms-code').value.trim();
+    const errEl = document.getElementById('itsr-sms-error');
+
+    if (!smsCode) {
+        errEl.textContent = 'Please enter the SMS verification code.';
+        errEl.classList.remove('d-none');
+        return;
+    }
+    errEl.classList.add('d-none');
+
+    // Hide close button during processing
+    const closeBtn = document.getElementById('itsr-modal-close-btn');
+    if (closeBtn) closeBtn.style.display = 'none';
+
+    _showItsrStep('itsr-step-creating');
+
+    fetch('/api/submit_itsr_sms/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({ session_id: itsrSessionId, sms_code: smsCode }),
+    })
+    .then(resp => resp.json())
+    .then(data => {
+        if (data.success) {
+            handleItsrSuccess(data);
+        } else {
+            handleItsrError(data.error || 'Ticket creation failed after SMS.');
+        }
+    })
+    .catch(err => {
+        handleItsrError('Network error: ' + err.message);
+    });
+}
+
+function handleItsrSuccess(data) {
+    _showItsrStep('itsr-step-success');
+
+    // Re-show close button
+    const closeBtn = document.getElementById('itsr-modal-close-btn');
+    if (closeBtn) closeBtn.style.display = '';
+
+    // Build details
+    let html = '<ul class="list-unstyled mb-0">';
+    if (data.bill_code) html += '<li><strong>Ticket ID:</strong> ' + data.bill_code + '</li>';
+    if (data.subject) html += '<li><strong>Subject:</strong> ' + data.subject + '</li>';
+    html += '</ul>';
+    document.getElementById('itsr-success-details').innerHTML = html;
+
+    // Update the main button
+    const btn = document.getElementById('itsr-ticket-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+        btn.innerHTML = '<i class="fas fa-check me-2"></i>ITSR Ticket Created';
+        btn.setAttribute('data-server-completed', 'true');
+    }
+    sessionStorage.setItem('ticket_itsr_completed', 'true');
+
+    // Also show a persistent alert on the page
+    let alertMsg = '✅ ITSR ticket created successfully!';
+    if (data.bill_code) alertMsg += '<br><strong>Ticket ID: ' + data.bill_code + '</strong>';
+    showAlert('success', alertMsg, false);
+}
+
+function handleItsrError(errorMessage) {
+    _showItsrStep('itsr-step-error');
+    document.getElementById('itsr-error-details').textContent = errorMessage;
+
+    // Re-show close button
+    const closeBtn = document.getElementById('itsr-modal-close-btn');
+    if (closeBtn) closeBtn.style.display = '';
+}
 
 </script>
 {% endblock body %}

@@ -249,6 +249,19 @@
                 </div>
             {% endif %}
 
+            <!-- Warning Message (no valid data found) -->
+            {% if warning_message %}
+                <div class="alert mb-4" role="alert" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 2px solid #f59e0b; border-radius: 1rem; padding: 1.5rem;">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-triangle me-3" style="font-size: 2rem; color: #d97706;"></i>
+                        <div>
+                            <h4 class="mb-1" style="color: #92400e;"><i class="fas fa-exclamation-triangle me-2"></i>No Data Found</h4>
+                            <p class="mb-0" style="color: #b45309; font-size: 1.1rem;">{{ warning_message }}</p>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             <!-- Success Message -->
             {% if success_message %}
                 <div class="alert alert-success mb-4" role="alert" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); border: 2px solid #10b981; border-radius: 1rem; padding: 1.5rem;">

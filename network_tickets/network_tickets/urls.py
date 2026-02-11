@@ -21,7 +21,10 @@ from django.conf.urls.static import static
 from views.index import index
 from auto_tickets.views.qyt_department_view_summary import show_ipdb
 from auto_tickets.views.qyt_department_addstudent import single_split
-from auto_tickets.views.multi_split import multi_split
+from auto_tickets.views.multi_split import (
+    multi_split, api_create_eoms_ticket, api_check_ticket_status,
+    api_create_itsr_ticket, api_submit_itsr_sms, api_check_itsr_create_status,
+)
 from auto_tickets.views.download_ITSRsample import download_ITSRsample
 from auto_tickets.views.ip_application import ip_application
 from auto_tickets.views.ip_deletion import ip_deletion
@@ -61,6 +64,12 @@ urlpatterns = [
     path('ip_deletion/', ip_deletion, name='ip_deletion'),
     path('single_split/', single_split, name='single_split'),
     path('multi_split/', multi_split, name='multi_split'),
+    path('api/create_eoms_ticket/', api_create_eoms_ticket, name='api_create_eoms_ticket'),
+    path('api/check_ticket_status/<str:task_id>/', api_check_ticket_status, name='api_check_ticket_status'),
+    # ITSR Create API endpoints
+    path('api/create_itsr_ticket/', api_create_itsr_ticket, name='api_create_itsr_ticket'),
+    path('api/submit_itsr_sms/', api_submit_itsr_sms, name='api_submit_itsr_sms'),
+    path('api/check_itsr_create_status/', api_check_itsr_create_status, name='api_check_itsr_create_status'),
     path('download_sample/', download_ITSRsample, name='download_sample'),
     path('accounts/login/', login_view, name='login'),
     path('accounts/logout/', logout_view, name='logout'),

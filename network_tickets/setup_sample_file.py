@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Script to set up the sample.xlsx file for download functionality.
+Script to set up the ITSR_Network_Ticket_Sample.xlsx file for download functionality.
 Run this script to create a DownloadFile entry in the database.
 """
 
@@ -15,7 +15,7 @@ django.setup()
 from auto_tickets.models import DownloadFile
 
 def setup_sample_file():
-    """Create a DownloadFile entry for the sample.xlsx file"""
+    """Create a DownloadFile entry for the ITSR_Network_Ticket_Sample.xlsx file"""
     
     # Check if sample file already exists
     try:
@@ -27,9 +27,8 @@ def setup_sample_file():
     
     # Look for existing sample files
     sample_files = [
-        'auto_tickets/ITSR_sample.xlsx',
-        'auto_tickets/sample.xlsx',
-        'sample.xlsx'
+        'auto_tickets/ITSR_Network_Ticket_Sample.xlsx',
+        'ITSR_Network_Ticket_Sample.xlsx'
     ]
     
     sample_file_path = None
@@ -40,7 +39,7 @@ def setup_sample_file():
             break
     
     if not sample_file_path:
-        print("No sample.xlsx file found. Please create one and place it in the auto_tickets directory.")
+        print("No ITSR_Network_Ticket_Sample.xlsx file found. Please create one and place it in the auto_tickets directory.")
         print("You can also upload it through the Django admin interface.")
         return None
     

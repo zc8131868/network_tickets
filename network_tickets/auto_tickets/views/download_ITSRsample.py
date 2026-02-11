@@ -5,7 +5,7 @@ from django.conf import settings
 
 def download_ITSRsample(request):
     try:
-        filename = "sample.xlsx"
+        filename = "ITSR_Network_Ticket_Sample.xlsx"
         print(f"1. Function called with filename: {filename}")
         
         # Construct the file path

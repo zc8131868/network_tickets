@@ -18,8 +18,8 @@ from playwright.async_api import async_playwright, Page, BrowserContext
 class EOmsClient:
     """EOMS 客户端"""
     
-    # 登录状态缓存文件路径
-    STORAGE_STATE_FILE = "eoms_auth_state.json"
+    # 登录状态缓存文件路径 - 使用绝对路径，避免权限问题
+    STORAGE_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eoms_auth_state.json")
     
     def __init__(self, username: str = "", password: str = "", storage_state_path: str = None):
         """

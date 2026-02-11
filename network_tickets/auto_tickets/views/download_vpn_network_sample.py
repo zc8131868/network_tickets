@@ -7,8 +7,8 @@ def download_vpn_network_sample(request):
     try:
         filename = "VPN_Network_Ticket_Sample.xlsx"
         
-        # Construct the file path - file is in auto_tickets directory
-        file_path = Path(settings.BASE_DIR) / 'auto_tickets' / filename
+        # Construct the file path - file is in media directory
+        file_path = Path(settings.MEDIA_ROOT) / filename
         
         # Check if file exists
         if not file_path.exists():
