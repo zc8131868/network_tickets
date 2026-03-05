@@ -300,6 +300,21 @@
                         {% endif %}
                     </div>
                 </div>
+                
+                <div class="row form-row">
+                    <div class="col-md-6">
+                        <label for="{{ form.staff_number.id_for_label }}" class="form-label">
+                            <i class="fas fa-id-badge me-2"></i>{{ form.staff_number.label }}
+                        </label>
+                        {{ form.staff_number }}
+                        {% if form.staff_number.errors %}
+                            <div class="invalid-feedback">
+                                {{ form.staff_number.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
                 <div class="text-center">
                     <button class="btn btn-submit" type="submit">
                         <i class="fas fa-paper-plane me-2"></i>Submit Application

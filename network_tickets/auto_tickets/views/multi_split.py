@@ -41,7 +41,7 @@ def _detect_file_format(sheet):
     Auto-detect whether the uploaded Excel file is ITSR format or VPN format.
     
     ITSR format: Has 'Source' in column B or C headers (e.g. 'Source Node Name', 'Source Node IP')
-    VPN format: Column C header contains 'Protocol' (e.g. 'Protocol (Select from the dropdown)')
+    VPN format: Column C header contains 'Description', Column D contains 'Protocol', Column E contains 'Port'
     
     Both formats have 'Ticket No.' in column A, so we differentiate by other columns.
     
@@ -49,16 +49,24 @@ def _detect_file_format(sheet):
     """
     header_b = str(sheet.cell(row=1, column=2).value or '').strip().lower()
     header_c = str(sheet.cell(row=1, column=3).value or '').strip().lower()
+    header_d = str(sheet.cell(row=1, column=4).value or '').strip().lower()
+    header_e = str(sheet.cell(row=1, column=5).value or '').strip().lower()
     # Also check row 2 (Chinese headers) as fallback
     header_b_row2 = str(sheet.cell(row=2, column=2).value or '').strip().lower()
     header_c_row2 = str(sheet.cell(row=2, column=3).value or '').strip().lower()
+    header_d_row2 = str(sheet.cell(row=2, column=4).value or '').strip().lower()
+    header_e_row2 = str(sheet.cell(row=2, column=5).value or '').strip().lower()
     
     # ITSR: Column B = "Source Node Name", Column C = "Source Node IP"
     if 'source' in header_b or 'source' in header_c or '源' in header_b_row2 or '源' in header_c_row2:
         return 'itsr'
     
-    # VPN: Column C = "Protocol", Column B = "Destination IP"
-    if 'protocol' in header_c or '协议' in header_c or '协议' in header_c_row2:
+    # VPN: Column C = "Description", Column D = "Protocol"
+    if 'description' in header_c or 'protocol' in header_d or '协议' in header_d or '协议' in header_d_row2:
+        return 'vpn'
+    
+    # Fallback: check column E for port-related keywords
+    if 'port' in header_e or '端口' in header_e_row2:
         return 'vpn'
     
     # Default to ITSR
@@ -106,7 +114,7 @@ def _ensure_session_dir():
     os.makedirs(EOMS_SESSION_DIR, exist_ok=True)
 
 
-def _write_eoms_template(template_name, sip_dic, dip_dic, dport_dic, protocol_dic, requestor_dic, session_id=None):
+def _write_eoms_template(template_name, source_name_dic, sip_dic, dest_name_dic, dip_dic, dport_dic, protocol_dic, requestor_dic, session_id=None):
     """
     Write data to a per-session copy of the EOMS template xlsx (Cloud or SN).
     
@@ -116,7 +124,7 @@ def _write_eoms_template(template_name, sip_dic, dip_dic, dport_dic, protocol_di
     
     Args:
         template_name: 'cloud' or 'sn' (used to pick the right template)
-        sip_dic, dip_dic, dport_dic, protocol_dic, requestor_dic: data dicts
+        source_name_dic, sip_dic, dest_name_dic, dip_dic, dport_dic, protocol_dic, requestor_dic: data dicts
         session_id: unique identifier for this session/request (uses uuid if None)
     
     Returns:
@@ -139,11 +147,13 @@ def _write_eoms_template(template_name, sip_dic, dip_dic, dport_dic, protocol_di
     sheet = wb.active
     # Clear existing data rows (from row 4 onwards) just in case
     for row in range(4, sheet.max_row + 1):
-        for col in [3, 5, 6, 7, 8]:  # Columns C, E, F, G, H
+        for col in [2, 3, 4, 5, 6, 7, 8]:  # Columns B, C, D, E, F, G, H
             sheet.cell(row=row, column=col).value = None
     # Write new data
     for row_num in sip_dic.keys():
+        sheet.cell(row=row_num, column=2).value = source_name_dic.get(row_num, '')
         sheet.cell(row=row_num, column=3).value = sip_dic[row_num]
+        sheet.cell(row=row_num, column=4).value = dest_name_dic.get(row_num, '')
         sheet.cell(row=row_num, column=5).value = dip_dic.get(row_num, '')
         dport_val = dport_dic.get(row_num, '')
         protocol_val = protocol_dic.get(row_num, '')
@@ -193,14 +203,14 @@ def _ensure_itsr_session_dir():
     os.makedirs(ITSR_SESSION_DIR, exist_ok=True)
 
 
-def _write_itsr_template(sip_dic, dip_dic, dport_dic, protocol_dic, requestor_dic, session_id=None):
+def _write_itsr_template(source_name_dic, sip_dic, dest_name_dic, dip_dic, dport_dic, protocol_dic, requestor_dic, session_id=None):
     """
     Create a per-session ITSR attachment xlsx with the collected ITSR data.
     
     The file is created from scratch (no pre-existing template needed).
     
     Args:
-        sip_dic, dip_dic, dport_dic, protocol_dic, requestor_dic: data dicts
+        source_name_dic, sip_dic, dest_name_dic, dip_dic, dport_dic, protocol_dic, requestor_dic: data dicts
         session_id: unique identifier for this session/request (uses uuid if None)
     
     Returns:
@@ -243,7 +253,9 @@ def _write_itsr_template(sip_dic, dip_dic, dport_dic, protocol_dic, requestor_di
     for row_num in sorted(sip_dic.keys()):
         idx = row_num - 3  # 1-based index
         sheet.cell(row=row_num, column=1).value = idx
+        sheet.cell(row=row_num, column=2).value = source_name_dic.get(row_num, '')
         sheet.cell(row=row_num, column=3).value = sip_dic[row_num]
+        sheet.cell(row=row_num, column=4).value = dest_name_dic.get(row_num, '')
         sheet.cell(row=row_num, column=5).value = dip_dic.get(row_num, '')
         dport_val = dport_dic.get(row_num, '')
         protocol_val = protocol_dic.get(row_num, '')
@@ -297,19 +309,25 @@ def _process_itsr_file(sheet):
     pattern = r'[ ,\n、]'
     result_list = []
 
+    sn_source_name_dic = {}
     sn_sip_dic = {}
+    sn_dest_name_dic = {}
     sn_dip_dic = {}
     sn_dport_dic = {}
     sn_protocol_dic = {}
     sn_requestor_dic = {}
 
+    cloud_source_name_dic = {}
     cloud_sip_dic = {}
+    cloud_dest_name_dic = {}
     cloud_dip_dic = {}
     cloud_dport_dic = {}
     cloud_protocol_dic = {}
     cloud_requestor_dic = {}
 
+    itsr_source_name_dic = {}
     itsr_sip_dic = {}
+    itsr_dest_name_dic = {}
     itsr_dip_dic = {}
     itsr_dport_dic = {}
     itsr_protocol_dic = {}
@@ -329,12 +347,13 @@ def _process_itsr_file(sheet):
     for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=8), start=4):
         try:
             if row[2].value and row[4].value and row[5].value and row[6].value:
+                source_name = str(row[1].value).strip() if row[1].value else ''
                 source_ip_list = [item for item in re.split(pattern, str(row[2].value)) if item.strip()]
+                dest_name = str(row[3].value).strip() if row[3].value else ''
                 destination_ip_list = [item for item in re.split(pattern, str(row[4].value)) if item.strip()]
                 destination_port_list = [item for item in re.split(pattern, str(row[5].value)) if item.strip()]
                 protocol_list = [item for item in re.split(pattern, str(row[6].value)) if item.strip()]
                 requestor_list = [item for item in re.split(pattern, str(row[7].value if row[7].value else '')) if item.strip()]
-                # Capture the first staff number found
                 if requestor_list and not staff_number:
                     staff_number = requestor_list[0]
                 for i in source_ip_list:
@@ -361,7 +380,9 @@ def _process_itsr_file(sheet):
                                     unique_key = f"{source_ip}_{destination_ip}_{','.join(sorted_protocols)}_{','.join(sorted_ports)}"
 
                                     if needs_cloud and unique_key not in cloud_processed_pairs:
+                                        cloud_source_name_dic[cloud_num] = source_name
                                         cloud_sip_dic[cloud_num] = source_ip
+                                        cloud_dest_name_dic[cloud_num] = dest_name
                                         cloud_dip_dic[cloud_num] = destination_ip
                                         cloud_dport_dic[cloud_num] = destination_port_list
                                         cloud_protocol_dic[cloud_num] = protocol_list
@@ -370,7 +391,9 @@ def _process_itsr_file(sheet):
                                         cloud_num += 1
 
                                     if needs_sn and unique_key not in sn_processed_pairs:
+                                        sn_source_name_dic[sn_num] = source_name
                                         sn_sip_dic[sn_num] = source_ip
+                                        sn_dest_name_dic[sn_num] = dest_name
                                         sn_dip_dic[sn_num] = destination_ip
                                         sn_dport_dic[sn_num] = destination_port_list
                                         sn_protocol_dic[sn_num] = protocol_list
@@ -379,7 +402,9 @@ def _process_itsr_file(sheet):
                                         sn_num += 1
 
                                     if needs_itsr and unique_key not in itsr_processed_pairs:
+                                        itsr_source_name_dic[itsr_num] = source_name
                                         itsr_sip_dic[itsr_num] = source_ip
+                                        itsr_dest_name_dic[itsr_num] = dest_name
                                         itsr_dip_dic[itsr_num] = destination_ip
                                         itsr_dport_dic[itsr_num] = destination_port_list
                                         itsr_protocol_dic[itsr_num] = protocol_list
@@ -408,13 +433,16 @@ def _process_itsr_file(sheet):
         'detected_cloud': detected_cloud,
         'detected_sn': detected_sn,
         'detected_itsr': detected_itsr,
-        'sn_sip_dic': sn_sip_dic, 'sn_dip_dic': sn_dip_dic,
+        'sn_source_name_dic': sn_source_name_dic, 'sn_sip_dic': sn_sip_dic,
+        'sn_dest_name_dic': sn_dest_name_dic, 'sn_dip_dic': sn_dip_dic,
         'sn_dport_dic': sn_dport_dic, 'sn_protocol_dic': sn_protocol_dic,
         'sn_requestor_dic': sn_requestor_dic,
-        'cloud_sip_dic': cloud_sip_dic, 'cloud_dip_dic': cloud_dip_dic,
+        'cloud_source_name_dic': cloud_source_name_dic, 'cloud_sip_dic': cloud_sip_dic,
+        'cloud_dest_name_dic': cloud_dest_name_dic, 'cloud_dip_dic': cloud_dip_dic,
         'cloud_dport_dic': cloud_dport_dic, 'cloud_protocol_dic': cloud_protocol_dic,
         'cloud_requestor_dic': cloud_requestor_dic,
-        'itsr_sip_dic': itsr_sip_dic, 'itsr_dip_dic': itsr_dip_dic,
+        'itsr_source_name_dic': itsr_source_name_dic, 'itsr_sip_dic': itsr_sip_dic,
+        'itsr_dest_name_dic': itsr_dest_name_dic, 'itsr_dip_dic': itsr_dip_dic,
         'itsr_dport_dic': itsr_dport_dic, 'itsr_protocol_dic': itsr_protocol_dic,
         'itsr_requestor_dic': itsr_requestor_dic,
         'staff_number': staff_number,
@@ -428,10 +456,11 @@ def _process_vpn_file(sheet):
     VPN format columns (data starts at row 4, row 3 is example):
         A (1): Ticket No.
         B (2): Destination IP
-        C (3): Protocol (TCP/UDP/ICMP)
-        D (4): Port/Services No.
-        E (5): Vendor Name
-        F (6): Requested by / Staff Number
+        C (3): Description (optional)
+        D (4): Protocol (TCP/UDP/ICMP)
+        E (5): Port/Services No.
+        F (6): Vendor Name
+        G (7): Requested by / Staff Number
     
     Source IPs are fixed: 10.51.203.0/24, 10.51.204.0/24
     
@@ -440,19 +469,25 @@ def _process_vpn_file(sheet):
     pattern = r'[ ,\n、，]'
     result_list = []
 
+    sn_source_name_dic = {}
     sn_sip_dic = {}
+    sn_dest_name_dic = {}
     sn_dip_dic = {}
     sn_dport_dic = {}
     sn_protocol_dic = {}
     sn_requestor_dic = {}
 
+    cloud_source_name_dic = {}
     cloud_sip_dic = {}
+    cloud_dest_name_dic = {}
     cloud_dip_dic = {}
     cloud_dport_dic = {}
     cloud_protocol_dic = {}
     cloud_requestor_dic = {}
 
+    itsr_source_name_dic = {}
     itsr_sip_dic = {}
+    itsr_dest_name_dic = {}
     itsr_dip_dic = {}
     itsr_dport_dic = {}
     itsr_protocol_dic = {}
@@ -469,17 +504,18 @@ def _process_vpn_file(sheet):
     itsr_processed_pairs = set()
     staff_number = ''
 
-    for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=6), start=4):
+    for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=7), start=4):
         try:
-            # VPN format: B=Dest IP, C=Protocol, D=Port are required
-            if not (row[1].value and row[2].value and row[3].value):
+            # VPN format: B=Dest IP, D=Protocol, E=Port are required (C=Description is optional)
+            if not (row[1].value and row[3].value and row[4].value):
                 continue
 
             destination_ip_list = [item for item in re.split(pattern, str(row[1].value)) if item.strip()]
-            protocol_list = [item for item in re.split(pattern, str(row[2].value)) if item.strip()]
-            destination_port_list = [item for item in re.split(pattern, str(row[3].value)) if item.strip()]
-            # Column F (index 5): Staff Number (requestor/originator)
-            row_staff = str(row[5].value).strip() if row[5].value else ''
+            dest_name = str(row[2].value).strip() if row[2].value else ''
+            protocol_list = [item for item in re.split(pattern, str(row[3].value)) if item.strip()]
+            destination_port_list = [item for item in re.split(pattern, str(row[4].value)) if item.strip()]
+            # Column G (index 6): Staff Number (requestor/originator)
+            row_staff = str(row[6].value).strip() if row[6].value else ''
             if row_staff and not staff_number:
                 staff_number = row_staff
 
@@ -508,7 +544,9 @@ def _process_vpn_file(sheet):
                         unique_key = f"{source_ip}_{destination_ip}_{','.join(sorted_protocols)}_{','.join(sorted_ports)}"
 
                         if needs_cloud and unique_key not in cloud_processed_pairs:
+                            cloud_source_name_dic[cloud_num] = 'VPN System'
                             cloud_sip_dic[cloud_num] = source_ip
+                            cloud_dest_name_dic[cloud_num] = dest_name
                             cloud_dip_dic[cloud_num] = destination_ip
                             cloud_dport_dic[cloud_num] = destination_port_list
                             cloud_protocol_dic[cloud_num] = protocol_list
@@ -517,7 +555,9 @@ def _process_vpn_file(sheet):
                             cloud_num += 1
 
                         if needs_sn and unique_key not in sn_processed_pairs:
+                            sn_source_name_dic[sn_num] = 'VPN System'
                             sn_sip_dic[sn_num] = source_ip
+                            sn_dest_name_dic[sn_num] = dest_name
                             sn_dip_dic[sn_num] = destination_ip
                             sn_dport_dic[sn_num] = destination_port_list
                             sn_protocol_dic[sn_num] = protocol_list
@@ -526,7 +566,9 @@ def _process_vpn_file(sheet):
                             sn_num += 1
 
                         if needs_itsr and unique_key not in itsr_processed_pairs:
+                            itsr_source_name_dic[itsr_num] = 'VPN System'
                             itsr_sip_dic[itsr_num] = source_ip
+                            itsr_dest_name_dic[itsr_num] = dest_name
                             itsr_dip_dic[itsr_num] = destination_ip
                             itsr_dport_dic[itsr_num] = destination_port_list
                             itsr_protocol_dic[itsr_num] = protocol_list
@@ -550,13 +592,16 @@ def _process_vpn_file(sheet):
         'detected_cloud': detected_cloud,
         'detected_sn': detected_sn,
         'detected_itsr': detected_itsr,
-        'sn_sip_dic': sn_sip_dic, 'sn_dip_dic': sn_dip_dic,
+        'sn_source_name_dic': sn_source_name_dic, 'sn_sip_dic': sn_sip_dic,
+        'sn_dest_name_dic': sn_dest_name_dic, 'sn_dip_dic': sn_dip_dic,
         'sn_dport_dic': sn_dport_dic, 'sn_protocol_dic': sn_protocol_dic,
         'sn_requestor_dic': sn_requestor_dic,
-        'cloud_sip_dic': cloud_sip_dic, 'cloud_dip_dic': cloud_dip_dic,
+        'cloud_source_name_dic': cloud_source_name_dic, 'cloud_sip_dic': cloud_sip_dic,
+        'cloud_dest_name_dic': cloud_dest_name_dic, 'cloud_dip_dic': cloud_dip_dic,
         'cloud_dport_dic': cloud_dport_dic, 'cloud_protocol_dic': cloud_protocol_dic,
         'cloud_requestor_dic': cloud_requestor_dic,
-        'itsr_sip_dic': itsr_sip_dic, 'itsr_dip_dic': itsr_dip_dic,
+        'itsr_source_name_dic': itsr_source_name_dic, 'itsr_sip_dic': itsr_sip_dic,
+        'itsr_dest_name_dic': itsr_dest_name_dic, 'itsr_dip_dic': itsr_dip_dic,
         'itsr_dport_dic': itsr_dport_dic, 'itsr_protocol_dic': itsr_protocol_dic,
         'itsr_requestor_dic': itsr_requestor_dic,
         'staff_number': staff_number,
@@ -692,7 +737,8 @@ def multi_split(request):
                 if data['sn_sip_dic']:
                     eoms_sn_path = _write_eoms_template(
                         'sn',
-                        data['sn_sip_dic'], data['sn_dip_dic'],
+                        data['sn_source_name_dic'], data['sn_sip_dic'],
+                        data['sn_dest_name_dic'], data['sn_dip_dic'],
                         data['sn_dport_dic'], data['sn_protocol_dic'],
                         data['sn_requestor_dic'],
                         session_id=processing_session_id
@@ -703,7 +749,8 @@ def multi_split(request):
                 if data['cloud_sip_dic']:
                     eoms_cloud_path = _write_eoms_template(
                         'cloud',
-                        data['cloud_sip_dic'], data['cloud_dip_dic'],
+                        data['cloud_source_name_dic'], data['cloud_sip_dic'],
+                        data['cloud_dest_name_dic'], data['cloud_dip_dic'],
                         data['cloud_dport_dic'], data['cloud_protocol_dic'],
                         data['cloud_requestor_dic'],
                         session_id=processing_session_id
@@ -713,7 +760,8 @@ def multi_split(request):
                 itsr_path = None
                 if data['itsr_sip_dic']:
                     itsr_path = _write_itsr_template(
-                        data['itsr_sip_dic'], data['itsr_dip_dic'],
+                        data['itsr_source_name_dic'], data['itsr_sip_dic'],
+                        data['itsr_dest_name_dic'], data['itsr_dip_dic'],
                         data['itsr_dport_dic'], data['itsr_protocol_dic'],
                         data['itsr_requestor_dic'],
                         session_id=processing_session_id
@@ -771,7 +819,7 @@ def multi_split(request):
                 else:
                     # No results found, show error
                     if file_format == 'vpn':
-                        form.add_error('file', 'No valid data found in the VPN Excel file. Please check that your file has Destination IP in column B, Protocol in column C, and Port in column D starting from row 4.')
+                        form.add_error('file', 'No valid data found in the VPN Excel file. Please check that your file has Destination IP in column B, Description in column C, Protocol in column D, and Port in column E starting from row 4.')
                     else:
                         form.add_error('file', 'No valid data found in the Excel file. Please check that your file has data in columns C and E starting from row 4.')
                     return render(request, 'multi_split.html', {'form': form})

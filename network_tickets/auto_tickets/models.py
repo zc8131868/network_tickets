@@ -49,10 +49,11 @@ class IP_Application(models.Model):
     usage = models.CharField(max_length=100, unique=False, blank=True, verbose_name='Application Usage')
     number = models.IntegerField(blank=True, verbose_name='Number of IPs')
     subnet = models.CharField(max_length=100, unique=True, blank=True, verbose_name='subnet')
+    staff_number = models.CharField(max_length=10, unique=True, null=True, blank=True, verbose_name='staff number')
     create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
 
     def __str__(self):
-        return f"{self.__class__.__name__}(location: {self.location} | usage: {self.usage} | number: {self.number} | subnet: {self.subnet} | description: {self.description})"
+        return f"{self.__class__.__name__}(location: {self.location} | usage: {self.usage} | number: {self.number} | subnet: {self.subnet} | staff_number: {self.staff_number} | description: {self.description})"
 
 
 class Vendor_VPN(models.Model):

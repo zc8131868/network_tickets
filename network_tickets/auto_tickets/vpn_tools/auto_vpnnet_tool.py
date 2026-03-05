@@ -20,6 +20,7 @@ def create_vpn_access_policy_tool(wb):
 
     ticket_number_dic = {}
     dip_dic = {}
+    description_dic = {}
     dport_dic = {}
     protocol_dic = {}
     vendor_name_dic = {}
@@ -33,15 +34,21 @@ def create_vpn_access_policy_tool(wb):
 
         ticket_number = sheet.cell(row=row, column=1).value
         dip = sheet.cell(row=row, column=2).value
-        protocol = (sheet.cell(row=row, column=3).value)
-        dport = sheet.cell(row=row, column=4).value
-        vendor_name = sheet.cell(row=row, column=5).value
+        description = sheet.cell(row=row, column=3).value
+        protocol = sheet.cell(row=row, column=4).value
+        dport = sheet.cell(row=row, column=5).value
+        vendor_name = sheet.cell(row=row, column=6).value
 
-        # Skip empty rows
-        if not any([ticket_number, dip, protocol, dport, vendor_name]):
+        # Skip empty rows (description is optional)
+        if not any([ticket_number, dip, dport, protocol, vendor_name]):
             continue
 
         row_errors = []
+
+        if description is not None and str(description).strip():
+            description_dic[row] = str(description).strip()
+        else:
+            description_dic[row] = ''
 
         if ticket_number is not None:
             ticket_number_dic[row] = str(ticket_number)
@@ -132,6 +139,7 @@ def create_vpn_access_policy_tool(wb):
             validation_errors.extend(row_errors)
             ticket_number_dic.pop(row, None)
             dip_dic.pop(row, None)
+            description_dic.pop(row, None)
             dport_dic.pop(row, None)
             protocol_dic.pop(row, None)
             vendor_name_dic.pop(row, None)
@@ -171,6 +179,7 @@ def create_vpn_access_policy_tool(wb):
                 print(f'Successful to create a policy for {ticket_number}')
                 success_results.append({
                     'ticket_number': ticket_number,
+                    'description': description_dic.get(row, ''),
                     'resource_id': resource_id,
                     'policy_id': policy_result['policy_id'],
                     'row': row

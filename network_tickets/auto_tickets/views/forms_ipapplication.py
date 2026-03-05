@@ -53,6 +53,16 @@ class IPApplicationForm(forms.Form):
         })
     )
 
+    staff_number = forms.CharField(
+        label='Staff Number',
+        required=False,
+        max_length=10,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'e.g. P1234',
+        })
+    )
+
     # deleted_ip = forms.CharField(
     #     label='Deleted IP',
     #     required=False,

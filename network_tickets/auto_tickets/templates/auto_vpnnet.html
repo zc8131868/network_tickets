@@ -311,6 +311,7 @@
                                         </button>
                                     </div>
                                     <pre id="result-{{ forloop.counter0 }}">Ticket Number: {{ result.ticket_number }}
+Description: {{ result.description }}
 Resource ID: {{ result.resource_id }}
 Policy ID: {{ result.policy_id }}
 Row: {{ result.row }}</pre>
@@ -338,9 +339,10 @@ Row: {{ result.row }}</pre>
                                 <li><i class="fas fa-check text-success me-2"></i>Use the provided sample template</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Column A: Ticket Number</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Column B: Destination IP (can be multiple, separated by comma)</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Column C: Protocol (tcp, udp, etc.)</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Column D: Destination Port (can be multiple, separated by comma)</li>
-                                <li><i class="fas fa-check text-success me-2"></i>Column E: Vendor Name/Email (can be multiple, separated by comma)</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Column C: Description (optional)</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Column D: Protocol (tcp, udp, etc.)</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Column E: Destination Port (can be multiple, separated by comma)</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Column F: Vendor Name/Email (can be multiple, separated by comma)</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Data starts from row 4</li>
                                 <li><i class="fas fa-check text-success me-2"></i>Save as .xlsx format</li>
                             </ul>

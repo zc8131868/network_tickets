@@ -10,7 +10,7 @@ def ip_application(request):
     '''
     MITA 10.1.96.0/19     Traffic
     MITA 10.0.192.0/21    OAM
-    GNC  10.1.1.0/21      Traffic
+    GNC  10.1.0.0/21      Traffic
     GNC  10.0.208.0/21    OAM
     Taiping 10.1.192.0/18 Traffic
     Taiping 10.0.200.0/21 OAM   
@@ -25,6 +25,7 @@ def ip_application(request):
             usage = form.cleaned_data['usage']
             number = form.cleaned_data['number']
             description = form.cleaned_data['description']
+            staff_number = form.cleaned_data.get('staff_number') or None
 
             if location == 'MITA':
                 if usage == 'Traffic':
@@ -53,7 +54,7 @@ def ip_application(request):
             subnet = generate_subnet(parent_network, int(number), normalized_existing)
 
             if subnet:
-                IP_Application.objects.create(location=location, usage=usage, number=int(number), subnet=str(subnet), description=description)
+                IP_Application.objects.create(location=location, usage=usage, number=int(number), subnet=str(subnet), description=description, staff_number=staff_number)
                 form = IPApplicationForm()  # Create fresh form with initial data
                 return render(request, 'ip_application.html', {'form': form, 'subnet': subnet})
             else:

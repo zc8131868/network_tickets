@@ -40,7 +40,7 @@ def auto_vpnnet(request):
                 
                 # If no results and no errors, show a warning message
                 if not success_results and not error_messages:
-                    context['warning_message'] = f'No valid data found in the uploaded file. Please ensure data starts from row 4 with all required columns (Ticket Number, Destination IP, Protocol, Destination Port, Vendor Name).'
+                    context['warning_message'] = f'No valid data found in the uploaded file. Please ensure data starts from row 4 with all required columns (Ticket Number, Destination IP, Description, Protocol, Destination Port, Vendor Name).'
                 
                 return render(request, 'auto_vpnnet.html', context)
             

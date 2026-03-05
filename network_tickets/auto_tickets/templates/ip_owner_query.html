@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+
+{% block head %}
+    <style type="text/css">
+    .security-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+    
+    .security-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        color: white;
+        padding: 4rem 0;
+        margin-bottom: 3rem;
+        border-radius: 0 0 3rem 3rem;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+    }
+    
+    .security-header h1 {
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .security-header p {
+        font-size: 1.4rem;
+        opacity: 0.95;
+        margin: 0;
+        font-weight: 500;
+    }
+    
+    .security-form-card {
+        background: white;
+        border-radius: 2rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        padding: 3rem;
+        margin-bottom: 2rem;
+        border: none;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .security-form-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(90deg, #3b82f6, #1e40af, #1d4ed8, #2563eb);
+    }
+    
+    .security-form-card .card-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        color: white;
+        border: none;
+        padding: 2rem 3rem;
+        margin: -3rem -3rem 2rem -3rem;
+        border-radius: 2rem 2rem 0 0;
+        font-size: 1.8rem;
+        font-weight: 700;
+        text-align: center;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+    }
+    
+    .form-row {
+        margin-bottom: 2rem;
+    }
+    
+    .form-label {
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .form-label i {
+        color: #3b82f6;
+        margin-right: 0.75rem;
+        font-size: 1.1rem;
+    }
+    
+    .form-control {
+        border-radius: 1.5rem;
+        border: 3px solid #e5e7eb;
+        padding: 1.25rem 1.5rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        background-color: #f9fafb;
+        font-weight: 500;
+    }
+    
+    .form-control:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+        background-color: white;
+        outline: none;
+    }
+    
+    .btn-security {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        border: none;
+        padding: 1.25rem 3rem;
+        font-size: 1.2rem;
+        font-weight: 700;
+        border-radius: 2rem;
+        color: white;
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .btn-security:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 30px rgba(59, 130, 246, 0.4);
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        color: white;
+    }
+    
+    .result-card {
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        border: 3px solid #22c55e;
+        border-radius: 2rem;
+        padding: 2.5rem;
+        margin-top: 2rem;
+    }
+    
+    .result-card h4 {
+        color: #15803d;
+        font-weight: 800;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .result-card h4 i {
+        margin-right: 1rem;
+        font-size: 1.8rem;
+    }
+    
+    .result-item {
+        display: flex;
+        padding: 1rem 0;
+        border-bottom: 2px solid rgba(34, 197, 94, 0.2);
+    }
+    
+    .result-item:last-child {
+        border-bottom: none;
+    }
+    
+    .result-label {
+        font-weight: 700;
+        color: #166534;
+        min-width: 150px;
+        font-size: 1.1rem;
+    }
+    
+    .result-value {
+        color: #1f2937;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .staff-number-highlight {
+        background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+        color: white;
+        padding: 0.5rem 1.5rem;
+        border-radius: 1rem;
+        font-weight: 800;
+        font-size: 1.3rem;
+        display: inline-block;
+    }
+    
+    .error-card {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border: 3px solid #ef4444;
+        border-radius: 2rem;
+        padding: 2rem;
+        margin-top: 2rem;
+    }
+    
+    .error-card h4 {
+        color: #dc2626;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+    }
+    
+    .error-card h4 i {
+        margin-right: 1rem;
+    }
+    </style>
+{% endblock head %}
+
+{% block body %}
+<div class="security-header">
+    <h1><i class="fas fa-user-shield me-3"></i>IP Owner Query</h1>
+    <p>Query IP address or subnet to find the owner's staff number</p>
+</div>
+
+<div class="security-container">
+    <div class="security-form-card">
+        <div class="card-header">
+            <i class="fas fa-search me-2"></i>Security Tools - IP Owner Query
+        </div>
+        
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-row">
+                <label class="form-label">
+                    <i class="fas fa-network-wired"></i>
+                    IP Address / Subnet
+                </label>
+                {{ form.ip_address }}
+                <small class="form-text text-muted mt-2">
+                    Enter an IP address (e.g., 10.0.8.50) or subnet (e.g., 10.0.8.0/24)
+                </small>
+            </div>
+            
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-security">
+                    <i class="fas fa-search me-2"></i>Query Owner
+                </button>
+            </div>
+        </form>
+        
+        {% if success and result %}
+        <div class="result-card">
+            <h4><i class="fas fa-check-circle"></i>Record Found</h4>
+            <div class="result-item">
+                <span class="result-label">Query Input:</span>
+                <span class="result-value">{{ ip_input }}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Staff Number:</span>
+                <span class="result-value">
+                    <span class="staff-number-highlight">{{ result.staff_number }}</span>
+                </span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Subnet:</span>
+                <span class="result-value">{{ result.subnet }}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Location:</span>
+                <span class="result-value">{{ result.location }}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Usage:</span>
+                <span class="result-value">{{ result.usage|default:"N/A" }}</span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Description:</span>
+                <span class="result-value">{{ result.description|default:"N/A" }}</span>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if error %}
+        <div class="error-card">
+            <h4><i class="fas fa-exclamation-circle"></i>{{ error }}</h4>
+            {% if ip_input %}
+            <p class="mb-0 mt-2">Query: <strong>{{ ip_input }}</strong></p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock body %}

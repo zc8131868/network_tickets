@@ -30,6 +30,7 @@ from auto_tickets.views.ip_application import ip_application
 from auto_tickets.views.ip_deletion import ip_deletion
 from auto_tickets.views.login import login_view, logout_view
 from auto_tickets.views.get_pa_nat import get_pa_nat
+from auto_tickets.views.ip_owner_query import ip_owner_query
 from auto_tickets.views.auto_tickets_pa import auto_tickets_pa
 from auto_tickets.views.auto_vpnnet import auto_vpnnet
 from auto_tickets.views.ticket_management import ticket_management
@@ -74,6 +75,7 @@ urlpatterns = [
     path('accounts/login/', login_view, name='login'),
     path('accounts/logout/', logout_view, name='logout'),
     path('get_pa_nat/', get_pa_nat, name='get_pa_nat'),
+    path('ip_owner_query/', ip_owner_query, name='ip_owner_query'),
     path('auto_tickets_pa/', auto_tickets_pa, name='auto_tickets_pa'),
     path('auto_vpnnet/', auto_vpnnet, name='auto_vpnnet'),
     path('ticket_management/', ticket_management, name='ticket_management'),
