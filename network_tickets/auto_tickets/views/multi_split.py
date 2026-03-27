@@ -1,4 +1,5 @@
 from auto_tickets.forms_multisplit import IPDBFORM_MULTISPLIT
+from auto_tickets.models import EomsTicketCreationTask
 from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.contrib import messages
@@ -6,7 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_exempt
 from auto_tickets.tools import tickets_split
-from auto_tickets.views.ITSR_Tools.eoms_automation import create_ticket
+from auto_tickets.views.ITSR_Tools.eoms_automation_2 import create_ticket
 from auto_tickets.views.ITSR_Tools.itsr_create import (
     create_ticket_session as itsr_create_ticket_session,
     submit_credentials as itsr_submit_credentials,
@@ -29,10 +30,42 @@ import glob as glob_module
 
 logger = logging.getLogger(__name__)
 
-# Global dict to store ticket creation tasks status
-_ticket_tasks = {}
 
-# VPN source IP ranges (fixed for all VPN tickets)
+def _eoms_task_row_to_dict(task):
+    """Shape expected by multi_split.html poll (matches former in-memory task dict)."""
+    if not task:
+        return None
+    return {
+        'status': task.status,
+        'success': task.success,
+        'department': task.department,
+        'requestor': task.requestor,
+        'inst_id': task.inst_id or None,
+        'message': task.message or '',
+        'error': task.error or '',
+        'need_captcha': task.need_captcha,
+        'resume_token': task.cas_resume_token or None,
+    }
+
+
+def _eoms_clear_session_cooldown(django_session_key, target_department):
+    """Clear per-dept cooldown so captcha / error retries are not blocked for 30s."""
+    if not django_session_key or not target_department:
+        return
+    try:
+        from django.contrib.sessions.backends.db import SessionStore
+
+        store = SessionStore(session_key=django_session_key)
+        store.load()
+        k = f'ticket_creation_{target_department.lower()}_timestamp'
+        if k in store:
+            del store[k]
+        store.save()
+    except Exception as ex:
+        logger.warning('EOMS: could not clear session cooldown: %s', ex)
+
+# VPN source IP ranges (fixed for all VPN tickets).
+# Both must exist in IPDB with the same location/device (e.g. SZ-VPN, DMZ SW01) or only the one in IPDB will appear in generated ticket files.
 VPN_SOURCE_IPS = ['10.51.203.0/24', '10.51.204.0/24']
 
 
@@ -281,13 +314,14 @@ def _cleanup_old_itsr_session_files(max_age_seconds=3600):
         if not os.path.exists(ITSR_SESSION_DIR):
             return
         now = time.time()
-        for filepath in glob_module.glob(os.path.join(ITSR_SESSION_DIR, 'itsr_*.xlsx')):
-            try:
-                file_age = now - os.path.getmtime(filepath)
-                if file_age > max_age_seconds:
-                    os.remove(filepath)
-            except OSError:
-                pass
+        for pattern in ('itsr_*.xlsx', 'original_*'):
+            for filepath in glob_module.glob(os.path.join(ITSR_SESSION_DIR, pattern)):
+                try:
+                    file_age = now - os.path.getmtime(filepath)
+                    if file_age > max_age_seconds:
+                        os.remove(filepath)
+                except OSError:
+                    pass
     except Exception:
         pass  # Cleanup is best-effort
 
@@ -299,6 +333,36 @@ def _cleanup_itsr_session_file(file_path):
             os.remove(file_path)
     except OSError:
         pass  # Best-effort cleanup
+
+
+def _sanitize_upload_basename(name):
+    """Safe filename fragment for storing a copy of the user's upload under itsr_session_files."""
+    base = os.path.basename(name or '') or 'upload.xlsx'
+    base = re.sub(r'[^\w.\-()\u4e00-\u9fff]', '_', base, flags=re.UNICODE)
+    return base[:180] if len(base) > 180 else base
+
+
+def _save_itsr_original_upload(uploaded_file, processing_session_id):
+    """
+    Save the user's workbook next to the generated ITSR xlsx so BPM can attach both.
+    Call after parsing; uses seek(0) because openpyxl may have read the upload stream.
+    """
+    _ensure_itsr_session_dir()
+    safe = _sanitize_upload_basename(uploaded_file.name)
+    if not any(safe.lower().endswith(ext) for ext in ('.xlsx', '.xls', '.xlsm')):
+        root, ext = os.path.splitext(safe)
+        safe = (root or 'upload') + (ext if ext else '.xlsx')
+    unique_filename = f'original_{processing_session_id}_{safe}'
+    unique_path = os.path.join(ITSR_SESSION_DIR, unique_filename)
+    try:
+        uploaded_file.seek(0)
+        with open(unique_path, 'wb') as out:
+            for chunk in uploaded_file.chunks():
+                out.write(chunk)
+        return os.path.abspath(unique_path)
+    except OSError:
+        logger.warning('Could not save ITSR original upload copy', exc_info=True)
+        return None
 
 
 def _process_itsr_file(sheet):
@@ -610,86 +674,6 @@ def _process_vpn_file(sheet):
 
 def multi_split(request):
     if request.method == 'POST':
-        # Check if this is a ticket creation request
-        if 'create_ticket' in request.POST:
-            target_department = request.POST.get('target_department')
-            if target_department in ['Cloud', 'SN']:
-                # Validate that the selected department was actually detected in the results
-                session_button_key = f'last_show_{target_department.lower()}_button'
-                department_detected = request.session.get(session_button_key, False)
-                
-                if not department_detected:
-                    messages.error(request, f'❌ Invalid request: {target_department} department was not detected in the results. Please process the file again.')
-                else:
-                    # Prevent duplicate submissions: check if ticket was created recently (within 30 seconds)
-                    import time
-                    session_key = f'ticket_creation_{target_department.lower()}_timestamp'
-                    last_creation_time = request.session.get(session_key, 0)
-                    current_time = time.time()
-                    cooldown_seconds = 30  # 30 seconds cooldown between ticket creations
-                    
-                    if current_time - last_creation_time < cooldown_seconds:
-                        remaining_time = int(cooldown_seconds - (current_time - last_creation_time))
-                        messages.warning(request, f'⏳ Please wait {remaining_time} seconds before creating another ticket for {target_department} department. This prevents duplicate ticket creation.')
-                    else:
-                        try:
-                            # Mark that we're creating a ticket (set timestamp before creation to prevent race conditions)
-                            request.session[session_key] = current_time
-                            request.session.save()
-                            
-                            
-                            # Call create_ticket directly (async function)
-                            # Use per-session unique file paths to avoid race conditions
-                            if target_department == 'Cloud':
-                                eoms_cloud_file_path = request.session.get('eoms_cloud_file_path')
-                                if not eoms_cloud_file_path or not os.path.exists(eoms_cloud_file_path):
-                                    messages.error(request, '❌ Session expired or file not found. Please re-upload and process the file.')
-                                    return redirect('multi_split')
-                                cloud_requestor = request.session.get('last_cloud_requestor', '')
-                                result = asyncio.run(create_ticket(target_department=target_department, file_path=eoms_cloud_file_path, originator=cloud_requestor if cloud_requestor else None))
-                            elif target_department == 'SN':
-                                eoms_sn_file_path = request.session.get('eoms_sn_file_path')
-                                if not eoms_sn_file_path or not os.path.exists(eoms_sn_file_path):
-                                    messages.error(request, '❌ Session expired or file not found. Please re-upload and process the file.')
-                                    return redirect('multi_split')
-                                sn_requestor = request.session.get('last_sn_requestor', '')
-                                result = asyncio.run(create_ticket(target_department=target_department, file_path=eoms_sn_file_path, originator=sn_requestor if sn_requestor else None))
-                            
-                            if result.get('success'):
-                                inst_id = result.get('inst_id')
-                                staff_number = request.session.get('last_staff_number', '')
-                                if inst_id:
-                                    msg = f'✅ Ticket created successfully for {target_department} department! Ticket Number: {inst_id}'
-                                    if staff_number:
-                                        msg += f' | Staff Number: {staff_number}'
-                                    messages.success(request, msg)
-                                else:
-                                    messages.success(request, f'✅ Ticket created successfully for {target_department} department!')
-                                if result.get('message'):
-                                    messages.info(request, f"Message: {result.get('message')}")
-                                # Mark ticket as created in session (server-side state)
-                                request.session[f'ticket_{target_department.lower()}_created'] = True
-                                # Clean up per-session file after successful ticket creation
-                                file_key = f'eoms_{target_department.lower()}_file_path'
-                                used_file_path = request.session.get(file_key)
-                                _cleanup_session_file(used_file_path)
-                                request.session.pop(file_key, None)
-                                request.session.modified = True  # Ensure session is marked as modified
-                                request.session.save()
-                            else:
-                                error_msg = result.get('error', 'Unknown error occurred')
-                                messages.error(request, f'❌ Failed to create ticket for {target_department}: {error_msg}')
-                                # On failure, allow retry sooner (remove the timestamp so user can try again)
-                                request.session.pop(session_key, None)
-                        except Exception as e:
-                            messages.error(request, f'❌ Error creating ticket: {str(e)}')
-                            # On exception, allow retry sooner
-                            request.session.pop(session_key, None)
-            
-            # Use POST-Redirect-GET pattern to avoid timeout issues
-            # Redirect back to the same page as GET request
-            return redirect('multi_split')
-        
         # File processing logic (supports both ITSR and VPN formats)
         form = IPDBFORM_MULTISPLIT(request.POST, request.FILES)
         if form.is_valid():
@@ -725,12 +709,15 @@ def multi_split(request):
                 old_sn_path = request.session.get('eoms_sn_file_path')
                 old_cloud_path = request.session.get('eoms_cloud_file_path')
                 old_itsr_path = request.session.get('itsr_file_path')
+                old_itsr_original = request.session.get('itsr_original_file_path')
                 if old_sn_path:
                     _cleanup_session_file(old_sn_path)
                 if old_cloud_path:
                     _cleanup_session_file(old_cloud_path)
                 if old_itsr_path:
                     _cleanup_itsr_session_file(old_itsr_path)
+                if old_itsr_original:
+                    _cleanup_itsr_session_file(old_itsr_original)
 
                 # Write EOMS SN template (per-session unique file)
                 eoms_sn_path = None
@@ -758,6 +745,7 @@ def multi_split(request):
 
                 # Write ITSR template (per-session unique file)
                 itsr_path = None
+                itsr_original_path = None
                 if data['itsr_sip_dic']:
                     itsr_path = _write_itsr_template(
                         data['itsr_source_name_dic'], data['itsr_sip_dic'],
@@ -765,6 +753,10 @@ def multi_split(request):
                         data['itsr_dport_dic'], data['itsr_protocol_dic'],
                         data['itsr_requestor_dic'],
                         session_id=processing_session_id
+                    )
+                    # Also persist the workbook the user uploaded (e.g. VPN template) as a second BPM attachment
+                    itsr_original_path = _save_itsr_original_upload(
+                        uploaded_file, processing_session_id
                     )
 
                 # Check if we got any results
@@ -793,6 +785,10 @@ def multi_split(request):
                     request.session['eoms_cloud_file_path'] = eoms_cloud_path
                     request.session['eoms_sn_file_path'] = eoms_sn_path
                     request.session['itsr_file_path'] = itsr_path
+                    if itsr_original_path:
+                        request.session['itsr_original_file_path'] = itsr_original_path
+                    else:
+                        request.session.pop('itsr_original_file_path', None)
                     # Store uploaded filename for ITSR ticket description
                     request.session['last_uploaded_filename'] = uploaded_file.name
                     # Clear previous ticket creation state when processing new file
@@ -847,56 +843,119 @@ def multi_split(request):
 # AJAX API Endpoints for ticket creation with background processing
 # ============================================================
 
-def _run_ticket_creation(task_id, target_department, file_path, requestor, session_key):
-    """Background function to create ticket"""
-    global _ticket_tasks
+def _run_ticket_creation(
+    task_id,
+    target_department,
+    file_path,
+    requestor,
+    django_session_key,
+    username,
+    password,
+    captcha_code,
+    resume_token,
+):
+    """Background worker: Playwright EOMS create (runs in a daemon thread)."""
+    from django.db import close_old_connections
+
+    close_old_connections()
     try:
-        result = asyncio.run(create_ticket(
-            target_department=target_department,
-            file_path=file_path,
-            originator=requestor if requestor else None
-        ))
-        _ticket_tasks[task_id] = {
-            'status': 'completed',
-            'success': result.get('success', False),
-            'inst_id': result.get('inst_id'),
-            'message': result.get('message'),
-            'error': result.get('error'),
-            'department': target_department,
-            'requestor': requestor,
-        }
-        # Clean up the per-session file after successful ticket creation
+        result = asyncio.run(
+            create_ticket(
+                target_department=target_department,
+                file_path=file_path,
+                username=username,
+                password=password,
+                originator=requestor if requestor else None,
+                captcha_code=captcha_code or '',
+                resume_token=resume_token or '',
+            )
+        )
+
+        if result.get('need_captcha'):
+            EomsTicketCreationTask.objects.filter(task_id=task_id).update(
+                status='need_captcha',
+                success=False,
+                need_captcha=True,
+                error=result.get('error') or result.get('message') or 'Captcha required',
+                cas_resume_token=result.get('resume_token') or '',
+            )
+            _eoms_clear_session_cooldown(django_session_key, target_department)
+            return
+
         if result.get('success'):
+            EomsTicketCreationTask.objects.filter(task_id=task_id).update(
+                status='completed',
+                success=True,
+                need_captcha=False,
+                inst_id=str(result.get('inst_id') or ''),
+                message=result.get('message') or '',
+                error='',
+            )
             _cleanup_session_file(file_path)
+        else:
+            EomsTicketCreationTask.objects.filter(task_id=task_id).update(
+                status='error',
+                success=False,
+                need_captcha=False,
+                error=result.get('error') or result.get('message') or 'Ticket creation failed',
+            )
+            _eoms_clear_session_cooldown(django_session_key, target_department)
     except Exception as e:
-        _ticket_tasks[task_id] = {
-            'status': 'error',
-            'success': False,
-            'error': str(e),
-            'department': target_department,
-            'requestor': requestor,
-        }
+        logger.exception('EOMS background task %s failed', task_id)
+        EomsTicketCreationTask.objects.filter(task_id=task_id).update(
+            status='error',
+            success=False,
+            need_captcha=False,
+            error=str(e),
+        )
+        _eoms_clear_session_cooldown(django_session_key, target_department)
+    finally:
+        close_old_connections()
+
+
+def _parse_eoms_create_payload(request):
+    """Support JSON (modal) and form POST (legacy)."""
+    ct = (request.content_type or '').lower()
+    if 'application/json' in ct and request.body:
+        try:
+            return json.loads(request.body)
+        except json.JSONDecodeError:
+            return {}
+    return request.POST
 
 
 @require_POST
 def api_create_eoms_ticket(request):
     """
-    AJAX endpoint to start ticket creation in background.
-    Returns immediately with a task_id for polling.
+    Start EOMS ticket creation in a background thread; returns task_id for polling.
+
+    JSON body (preferred):
+        username, password, target_department ("Cloud" | "SN"),
+        captcha_code (optional), resume_token (optional, SMS second step)
+
+    Form POST (legacy): same field names.
     """
-    global _ticket_tasks
-    
-    target_department = request.POST.get('target_department')
-    
+    data = _parse_eoms_create_payload(request)
+    target_department = (data.get('target_department') or '').strip()
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+    captcha_code = (data.get('captcha_code') or '').strip()
+    resume_token = (data.get('resume_token') or '').strip()
+
     if target_department not in ['Cloud', 'SN']:
         return JsonResponse({'success': False, 'error': 'Invalid department'}, status=400)
-    
-    # Check cooldown
-    session_key = f'ticket_creation_{target_department.lower()}_timestamp'
-    last_creation_time = request.session.get(session_key, 0)
+
+    if not username or not password:
+        return JsonResponse(
+            {'success': False, 'error': 'Username and password are required.'},
+            status=400,
+        )
+
+    cooldown_key = f'ticket_creation_{target_department.lower()}_timestamp'
+    last_creation_time = request.session.get(cooldown_key, 0)
     current_time = time.time()
     cooldown_seconds = 30
-    
+
     if current_time - last_creation_time < cooldown_seconds:
         remaining_time = int(cooldown_seconds - (current_time - last_creation_time))
         return JsonResponse({
@@ -905,44 +964,52 @@ def api_create_eoms_ticket(request):
             'cooldown': True,
             'remaining': remaining_time,
         })
-    
-    # Set cooldown timestamp
-    request.session[session_key] = current_time
+
+    request.session[cooldown_key] = current_time
     request.session.save()
-    
-    # Generate task ID
-    task_id = str(uuid.uuid4())
-    
-    # Determine file path and requestor (use per-session unique files)
+
     if target_department == 'Cloud':
         file_path = request.session.get('eoms_cloud_file_path')
         requestor = request.session.get('last_cloud_requestor', '')
     else:
         file_path = request.session.get('eoms_sn_file_path')
         requestor = request.session.get('last_sn_requestor', '')
-    
+
     if not file_path or not os.path.exists(file_path):
-        # Reset cooldown since we couldn't proceed
-        request.session.pop(session_key, None)
+        request.session.pop(cooldown_key, None)
+        request.session.save()
         return JsonResponse({
             'success': False,
             'error': 'Session expired or file not found. Please re-upload and process the file.',
         }, status=400)
-    
-    # Initialize task status
-    _ticket_tasks[task_id] = {
-        'status': 'processing',
-        'department': target_department,
-    }
-    
-    # Start background thread
+
+    task_id = str(uuid.uuid4())
+    EomsTicketCreationTask.objects.create(
+        task_id=task_id,
+        status='processing',
+        department=target_department,
+        requestor=requestor or '',
+    )
+
+    django_session_key = getattr(request.session, 'session_key', None) or ''
+
     thread = threading.Thread(
         target=_run_ticket_creation,
-        args=(task_id, target_department, file_path, requestor, session_key)
+        args=(
+            task_id,
+            target_department,
+            file_path,
+            requestor,
+            django_session_key,
+            username,
+            password,
+            captcha_code,
+            resume_token,
+        ),
     )
     thread.daemon = True
     thread.start()
-    
+
     return JsonResponse({
         'success': True,
         'task_id': task_id,
@@ -953,31 +1020,121 @@ def api_create_eoms_ticket(request):
 @require_GET
 def api_check_ticket_status(request, task_id):
     """
-    AJAX endpoint to check ticket creation status.
+    Poll background EOMS task status (DB-backed — safe across Gunicorn workers).
     """
-    global _ticket_tasks
-    
-    if task_id not in _ticket_tasks:
+    try:
+        row = EomsTicketCreationTask.objects.get(task_id=task_id)
+    except EomsTicketCreationTask.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Task not found'}, status=404)
-    
-    task = _ticket_tasks[task_id]
-    
-    # If completed, update session and clean up
-    if task['status'] in ['completed', 'error']:
-        if task.get('success'):
-            # Mark as created in session
-            dept_lower = task['department'].lower()
-            request.session[f'ticket_{dept_lower}_created'] = True
-            request.session.modified = True
-            request.session.save()
-        
-        # Clean up old tasks (keep for 5 minutes for late polling)
-        # In production, use Redis or similar for this
-        
+
+    task = _eoms_task_row_to_dict(row)
+
+    if row.status == 'completed' and row.success:
+        dept_lower = row.department.lower()
+        request.session[f'ticket_{dept_lower}_created'] = True
+        file_key = f'eoms_{dept_lower}_file_path'
+        request.session.pop(file_key, None)
+        request.session.modified = True
+        request.session.save()
+
     return JsonResponse({
         'success': True,
         'task': task,
     })
+
+
+@csrf_exempt
+@require_POST
+def api_create_eoms_ticket_v2(request):
+    """
+    EOMS ticket creation with user-provided credentials (blocking).
+    Follows the same modal flow as ITSR: credentials → optional captcha → result.
+
+    Expects JSON body:
+        {
+            "username": "...",
+            "password": "...",
+            "target_department": "Cloud" | "SN",
+            "captcha_code": ""  (optional, for retry after captcha detected)
+        }
+    """
+    try:
+        data = json.loads(request.body) if request.body else {}
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        target_department = data.get('target_department', '').strip()
+        captcha_code = data.get('captcha_code', '').strip()
+        resume_token = data.get('resume_token', '').strip()
+
+        if not username or not password:
+            return JsonResponse({
+                'success': False,
+                'error': 'Username and password are required.',
+            }, status=400)
+
+        if target_department not in ['Cloud', 'SN']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Invalid department. Must be "Cloud" or "SN".',
+            }, status=400)
+
+        # Determine file path and requestor from session
+        if target_department == 'Cloud':
+            file_path = request.session.get('eoms_cloud_file_path')
+            requestor = request.session.get('last_cloud_requestor', '')
+        else:
+            file_path = request.session.get('eoms_sn_file_path')
+            requestor = request.session.get('last_sn_requestor', '')
+
+        if not file_path or not os.path.exists(file_path):
+            return JsonResponse({
+                'success': False,
+                'error': 'Session expired or file not found. Please re-upload and process the file.',
+            }, status=400)
+
+        result = asyncio.run(create_ticket(
+            target_department=target_department,
+            file_path=file_path,
+            username=username,
+            password=password,
+            originator=requestor if requestor else None,
+            captcha_code=captcha_code,
+            resume_token=resume_token,
+        ))
+
+        if result.get('need_captcha'):
+            return JsonResponse({
+                'success': False,
+                'need_captcha': True,
+                'error': result.get('error', 'Captcha/SMS verification required.'),
+                'resume_token': result.get('resume_token'),
+            })
+
+        if result.get('success'):
+            dept_lower = target_department.lower()
+            request.session[f'ticket_{dept_lower}_created'] = True
+            # Clean up per-session file
+            _cleanup_session_file(file_path)
+            file_key = f'eoms_{dept_lower}_file_path'
+            request.session.pop(file_key, None)
+            request.session.save()
+
+            return JsonResponse({
+                'success': True,
+                'inst_id': result.get('inst_id'),
+                'message': result.get('message', 'Ticket created successfully.'),
+                'department': target_department,
+                'requestor': requestor,
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': result.get('error', 'Ticket creation failed.'),
+            })
+
+    except Exception as e:
+        logger.error(f"Error in api_create_eoms_ticket_v2: {e}", exc_info=True)
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 # ============================================================
@@ -1028,6 +1185,11 @@ def api_create_itsr_ticket(request):
 
         uploaded_filename = request.session.get('last_uploaded_filename', 'Network Policy Request')
 
+        attachment_paths = [itsr_file_path]
+        orig_path = request.session.get('itsr_original_file_path')
+        if orig_path and os.path.exists(orig_path):
+            attachment_paths.append(orig_path)
+
         # 1. Create ITSR session
         session_id = itsr_create_ticket_session(
             title=ITSR_TICKET_TITLE,
@@ -1035,7 +1197,7 @@ def api_create_itsr_ticket(request):
             product_line_id=ITSR_PRODUCT_LINE_ID,
             urgency=ITSR_URGENCY,
             requirement_type=ITSR_REQUIREMENT_TYPE,
-            attachment_files=[itsr_file_path],  # absolute path
+            attachment_files=attachment_paths,  # generated ITSR xlsx + optional user workbook
         )
         logger.info(f"ITSR create session started: {session_id}")
 
@@ -1058,9 +1220,11 @@ def api_create_itsr_ticket(request):
             if result.success:
                 # Mark as created
                 request.session['ticket_itsr_created'] = True
-                # Clean up session file
+                # Clean up session files
                 _cleanup_itsr_session_file(itsr_file_path)
+                _cleanup_itsr_session_file(request.session.get('itsr_original_file_path'))
                 request.session.pop('itsr_file_path', None)
+                request.session.pop('itsr_original_file_path', None)
                 request.session.pop('itsr_create_session_id', None)
                 request.session.save()
 
@@ -1121,10 +1285,12 @@ def api_submit_itsr_sms(request):
         if result.success:
             # Mark as created in session
             request.session['ticket_itsr_created'] = True
-            # Clean up session file
+            # Clean up session files
             itsr_file_path = request.session.get('itsr_file_path')
             _cleanup_itsr_session_file(itsr_file_path)
+            _cleanup_itsr_session_file(request.session.get('itsr_original_file_path'))
             request.session.pop('itsr_file_path', None)
+            request.session.pop('itsr_original_file_path', None)
             request.session.pop('itsr_create_session_id', None)
             request.session.save()
 

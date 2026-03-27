@@ -222,3 +222,16 @@ NETWORK_SPEED_THRESHOLDS = {
 }
 
 NETWORK_SPEED_TIMEOUT = 5  # seconds
+
+# ---------------------------------------------------------------------------
+# Elasticsearch (EFK syslog stack)
+# ---------------------------------------------------------------------------
+ELASTIC_URL = os.getenv("ELASTIC_URL", "https://localhost:9200")
+ELASTIC_USERNAME = os.getenv("ELASTIC_USERNAME", "elastic")
+ELASTIC_PASSWORD = os.getenv("ELASTIC_PASSWORD", "")
+ELASTIC_CA_CERT = os.getenv("ELASTIC_CA_CERT", "")
+ELASTIC_INDEX_PATTERN = os.getenv("ELASTIC_INDEX_PATTERN", "cisco-logs-*,panw-logs-*")
+ELASTIC_MAX_RESULTS = int(os.getenv("ELASTIC_MAX_RESULTS", "200"))
+
+# Internal bearer token for machine-to-machine API calls (e.g. OpenClaw exec)
+OPENCLAW_INTERNAL_TOKEN = os.getenv("OPENCLAW_INTERNAL_TOKEN", "")

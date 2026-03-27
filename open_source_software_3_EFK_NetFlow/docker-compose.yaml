@@ -1,0 +1,128 @@
+version: '3'
+services:
+  elasticsearch:
+    image: elastic/elasticsearch:7.8.1
+    privileged: true
+    environment:
+      - discovery.type=single-node
+      - node.name=qytang_es
+      - cluster.name=qytang_es_cluster
+      - network.host=0.0.0.0
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms4g -Xmx4g"
+      - TZ=Asia/Shanghai
+#    volumes:
+#      - /usr/share/elasticsearch/data  # 数据持久化
+    networks:
+      - qyt_net
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    restart: always
+
+  kibana:
+    image: elastic/kibana:7.8.1
+    privileged: true
+    environment:
+      - SERVER_NAME=qyt_kibana
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - PATH_DATA=/usr/share/kibana/data
+      - NODE_OPTIONS="--max_old_space_size=4096"
+      - TZ=Asia/Shanghai
+#    volumes:
+#      - /usr/share/kibana/data  # 数据持久化
+    networks:
+      - qyt_net
+    ports:
+      - "5601:5601"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    depends_on:
+      - "elasticsearch"
+    restart: always
+
+  filebeat:
+    image: elastic/filebeat:7.8.1
+    privileged: true
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./filebeat/cisco.yml:/usr/share/filebeat/modules.d/cisco.yml
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - qyt_net
+    ports:
+      - "514:9001/udp"
+    depends_on:
+      - "elasticsearch"
+      - "kibana"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: always
+
+  elastiflow-logstash:
+    image: robcowart/elastiflow-logstash:4.0.1
+    container_name: elastiflow-logstash
+    depends_on:
+      - elasticsearch
+    networks:
+      - qyt_net
+    ports:
+      - "2055:2055/udp"
+      - "6343:6343/udp"
+      - "4739:4739/udp"
+    environment:
+      TZ: Asia/Shanghai
+      # JVM Heap size - this MUST be at least 3GB (4GB preferred)
+      LS_JAVA_OPTS: '-Xms4g -Xmx4g'
+
+      # ElastiFlow global configuration
+      ELASTIFLOW_AGENT_ID: elastiflow
+      ELASTIFLOW_GEOIP_CACHE_SIZE: 16384
+      ELASTIFLOW_GEOIP_LOOKUP: 'true'
+      ELASTIFLOW_ASN_LOOKUP: 'true'
+      ELASTIFLOW_OUI_LOOKUP: 'false'
+      ELASTIFLOW_POPULATE_LOGS: 'true'
+      ELASTIFLOW_KEEP_ORIG_DATA: 'true'
+      ELASTIFLOW_DEFAULT_APPID_SRCTYPE: '__UNKNOWN'
+
+      ELASTIFLOW_ES_HOST: 'elasticsearch:9200'
+      #ELASTIFLOW_ES_USER: 'elastic'
+      #ELASTIFLOW_ES_PASSWD: 'changeme'
+
+      ELASTIFLOW_NETFLOW_IPV4_PORT: 2055
+      ELASTIFLOW_NETFLOW_UDP_WORKERS: 2
+      ELASTIFLOW_NETFLOW_UDP_QUEUE_SIZE: 4096
+      ELASTIFLOW_NETFLOW_UDP_RCV_BUFF: 33554432
+
+      ELASTIFLOW_SFLOW_IPV4_PORT: 6343
+      ELASTIFLOW_SFLOW_UDP_WORKERS: 2
+      ELASTIFLOW_SFLOW_UDP_QUEUE_SIZE: 4096
+      ELASTIFLOW_SFLOW_UDP_RCV_BUFF: 33554432
+
+      ELASTIFLOW_IPFIX_UDP_IPV4_PORT: 4739
+      ELASTIFLOW_IPFIX_UDP_WORKERS: 2
+      ELASTIFLOW_IPFIX_UDP_QUEUE_SIZE: 4096
+      ELASTIFLOW_IPFIX_UDP_RCV_BUFF: 33554432
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    restart: always
+
+networks:
+  qyt_net:
+    driver: bridge

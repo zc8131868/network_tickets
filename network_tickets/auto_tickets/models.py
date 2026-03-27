@@ -49,7 +49,7 @@ class IP_Application(models.Model):
     usage = models.CharField(max_length=100, unique=False, blank=True, verbose_name='Application Usage')
     number = models.IntegerField(blank=True, verbose_name='Number of IPs')
     subnet = models.CharField(max_length=100, unique=True, blank=True, verbose_name='subnet')
-    staff_number = models.CharField(max_length=10, unique=True, null=True, blank=True, verbose_name='staff number')
+    staff_number = models.CharField(max_length=10, null=True, blank=True, verbose_name='staff number')
     create_datetime = models.DateTimeField(auto_now_add=True, verbose_name='create time')
 
     def __str__(self):
@@ -120,6 +120,44 @@ class EOMS_Tickets(models.Model):
 
     def __str__(self):
         return f"{self.__class__.__name__}(eoms_ticket_number: {self.eoms_ticket_number} | create_datetime: {self.create_datetime} | description: {getattr(self, 'description', '')} | attachment: {getattr(self, 'attachment', '')})"
+
+
+class EomsTicketCreationTask(models.Model):
+    """
+    Background EOMS ticket creation status (shared across Gunicorn workers via DB).
+
+    Used by api_create_eoms_ticket + api_check_ticket_status instead of in-memory dict.
+    """
+
+    task_id = models.CharField(max_length=64, unique=True, db_index=True)
+    status = models.CharField(
+        max_length=32,
+        default='processing',
+        help_text='processing | completed | error | need_captcha',
+    )
+    department = models.CharField(max_length=16, blank=True, default='')
+    requestor = models.CharField(max_length=255, blank=True, default='')
+    success = models.BooleanField(null=True, blank=True)
+    need_captcha = models.BooleanField(default=False)
+    inst_id = models.CharField(max_length=128, blank=True, default='')
+    message = models.TextField(blank=True, default='')
+    error = models.TextField(blank=True, default='')
+    cas_resume_token = models.CharField(
+        max_length=40,
+        blank=True,
+        default='',
+        help_text='Playwright storage resume id for CAS SMS second step',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['-created_at']),
+        ]
+
+    def __str__(self):
+        return f'EomsTicketCreationTask({self.task_id}, {self.status})'
 
 # ---
 

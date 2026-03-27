@@ -1,6 +1,46 @@
 from django import forms
-from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
 from auto_tickets.models import ITSR_Network
+
+
+class MultipleFileInput(forms.FileInput):
+    def __init__(self, attrs=None):
+        super().__init__(attrs)
+        if self.attrs is not None:
+            self.attrs.setdefault('multiple', True)
+        else:
+            self.attrs = {'multiple': True}
+
+    def value_from_datadict(self, data, files, name):
+        if files is not None and hasattr(files, 'getlist'):
+            return files.getlist(name)
+        if files:
+            return files.get(name)
+        return None
+
+
+class MultipleFileField(forms.Field):
+    """Optional multi-file upload; cleaned value is a list of UploadedFile."""
+
+    def __init__(self, *args, **kwargs):
+        wattrs = kwargs.pop('widget_attrs', None) or {}
+        kwargs.setdefault('required', False)
+        kwargs.setdefault(
+            'widget',
+            MultipleFileInput(attrs=wattrs),
+        )
+        super().__init__(*args, **kwargs)
+
+    def clean(self, value):
+        value = super().clean(value)
+        if not value:
+            return []
+        if not isinstance(value, (list, tuple)):
+            value = [value]
+        files = [f for f in value if f and getattr(f, 'name', None)]
+        if len(files) > 25:
+            raise ValidationError('You can upload at most 25 files at once.')
+        return list(files)
 
 
 class TicketManagementForm(forms.Form):
@@ -74,13 +114,11 @@ class TicketManagementForm(forms.Form):
         })
     )
 
-    file = forms.FileField(
-        label='Upload File',
-        required=False,
-        widget=forms.FileInput(attrs={
+    files = MultipleFileField(
+        label='Attachments',
+        widget_attrs={
             'class': 'form-control',
-            'accept': '*/*'
-        })
+            'accept': '*/*',
+        },
     )
 
-    

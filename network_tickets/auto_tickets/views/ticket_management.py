@@ -62,7 +62,7 @@ def ticket_management(request):
             ticket_status = form.cleaned_data['ticket_status']
             itsr_status = form.cleaned_data['itsr_status']
             description = form.cleaned_data.get('description', '')
-            uploaded_file = form.cleaned_data.get('file')
+            uploaded_files = form.cleaned_data.get('files') or []
             
             try:
                 # Check if ticket number already exists
@@ -70,9 +70,9 @@ def ticket_management(request):
                     form.add_error('itsr_ticket_number', 'This ITSR ticket number already exists in the database.')
                     return render(request, 'ticket_management.html', {'form': form})
                 
-                # Handle file upload if provided
-                saved_file_path = None
-                if uploaded_file:
+                # Handle one or more file uploads (optional)
+                saved_file_paths = []
+                if uploaded_files:
                     # Create itsr_files directory if it doesn't exist
                     itsr_files_dir = os.path.join(settings.BASE_DIR, 'auto_tickets', 'itsr_files')
                     os.makedirs(itsr_files_dir, mode=0o755, exist_ok=True)
@@ -85,39 +85,36 @@ def ticket_management(request):
                             'error_message': error_message
                         })
                     
-                    # Clean up files older than 6 months before saving new file
+                    # Clean up files older than retention before saving new files
                     deleted_count, error_count = cleanup_old_files(itsr_files_dir, retention_months=2)
                     
-                    # Generate filename: ticket_number_original_filename_timestamp.ext
-                    file_extension = os.path.splitext(uploaded_file.name)[1]
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     safe_ticket_number = itsr_ticket_number.replace('/', '_').replace('\\', '_')
-                    original_name = os.path.splitext(uploaded_file.name)[0]
-                    # Sanitize filename
-                    safe_original_name = "".join(c for c in original_name if c.isalnum() or c in (' ', '-', '_')).strip()
-                    safe_original_name = safe_original_name.replace(' ', '_')
-                    
-                    filename = f"{safe_ticket_number}_{safe_original_name}_{timestamp}{file_extension}"
-                    file_path = os.path.join(itsr_files_dir, filename)
-                    
-                    # Save the file
-                    try:
-                        with open(file_path, 'wb+') as destination:
-                            for chunk in uploaded_file.chunks():
-                                destination.write(chunk)
-                        saved_file_path = file_path
-                    except PermissionError as pe:
-                        error_message = f'Error saving ticket: Permission denied when writing to {filename}. Please contact the administrator.'
-                        return render(request, 'ticket_management.html', {
-                            'form': form,
-                            'error_message': error_message
-                        })
-                    except OSError as ose:
-                        error_message = f'Error saving ticket: {str(ose)}. Please contact the administrator.'
-                        return render(request, 'ticket_management.html', {
-                            'form': form,
-                            'error_message': error_message
-                        })
+                    for idx, uploaded_file in enumerate(uploaded_files):
+                        file_extension = os.path.splitext(uploaded_file.name)[1]
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                        original_name = os.path.splitext(uploaded_file.name)[0]
+                        safe_original_name = "".join(c for c in original_name if c.isalnum() or c in (' ', '-', '_')).strip()
+                        safe_original_name = safe_original_name.replace(' ', '_') or 'file'
+                        filename = f"{safe_ticket_number}_{safe_original_name}_{idx}_{timestamp}{file_extension}"
+                        file_path = os.path.join(itsr_files_dir, filename)
+                        
+                        try:
+                            with open(file_path, 'wb+') as destination:
+                                for chunk in uploaded_file.chunks():
+                                    destination.write(chunk)
+                            saved_file_paths.append(file_path)
+                        except PermissionError as pe:
+                            error_message = f'Error saving ticket: Permission denied when writing to {filename}. Please contact the administrator.'
+                            return render(request, 'ticket_management.html', {
+                                'form': form,
+                                'error_message': error_message
+                            })
+                        except OSError as ose:
+                            error_message = f'Error saving ticket: {str(ose)}. Please contact the administrator.'
+                            return render(request, 'ticket_management.html', {
+                                'form': form,
+                                'error_message': error_message
+                            })
                 
                 # Create new ticket entry
                 ITSR_Network.objects.create(
@@ -132,8 +129,9 @@ def ticket_management(request):
                 # Reset form and show success message
                 form = TicketManagementForm()
                 success_message = f'Successfully created ticket entry for ITSR: {itsr_ticket_number}'
-                if saved_file_path:
-                    success_message += f' and saved file: {os.path.basename(saved_file_path)}'
+                if saved_file_paths:
+                    names = ', '.join(os.path.basename(p) for p in saved_file_paths)
+                    success_message += f' and saved {len(saved_file_paths)} attachment(s): {names}'
                 return render(request, 'ticket_management.html', {
                     'form': form,
                     'success_message': success_message

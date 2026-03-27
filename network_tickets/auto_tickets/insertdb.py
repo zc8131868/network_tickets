@@ -39,4 +39,4 @@ if __name__ == "__main__":
     # res = IPDB.objects.all()
     # for i in res:
     #     print(i.device)
-    IPDB.objects.create(ip='10.51.203.0', mask='255.255.255.0', traffic_oam='NA', location='SZ-VPN', device='DMZ SW01')
+    IPDB.objects.create(ip='10.51.204.0', mask='255.255.255.0', traffic_oam='NA', location='SZ-VPN', device='DMZ SW01')

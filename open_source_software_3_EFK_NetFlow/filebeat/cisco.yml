@@ -1,0 +1,24 @@
+# Module: cisco
+# Docs: https://www.elastic.co/guide/en/beats/filebeat/7.9/filebeat-module-cisco.html
+# Device types: ASA, IOS, IOS-XE (same parser as IOS), Nexus.
+# Index routing: cisco-logs-* (via output.elasticsearch.indices condition on event.dataset)
+
+- module: cisco
+  asa:
+    enabled: true
+    var.syslog_host: 0.0.0.0
+    var.syslog_port: 9001
+    var.log_level: 7
+
+  ftd:
+    enabled: false
+
+  ios:
+    enabled: true
+    var.syslog_host: 0.0.0.0
+    var.syslog_port: 9002
+
+  nexus:
+    enabled: true
+    var.syslog_host: 0.0.0.0
+    var.syslog_port: 9506

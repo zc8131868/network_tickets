@@ -1,0 +1,20 @@
+# OpenSSL config for Elasticsearch server cert with SAN for host and IP access.
+# Use this when regenerating server-elasticsearch.pem so that both
+# https://elasticsearch.qytopensource.com:9200 and https://172.19.11.14:9200 validate.
+
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = elasticsearch.qytopensource.com
+
+[v3_req]
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = elasticsearch.qytopensource.com
+DNS.2 = localhost
+IP.1 = 172.19.11.14
+IP.2 = 127.0.0.1

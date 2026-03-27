@@ -1,0 +1,27 @@
+filebeat.config:
+  modules:
+    path: ${path.config}/modules.d/*.yml
+    reload.enabled: false
+
+processors:
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+
+output.elasticsearch:
+  hosts: ["https://elasticsearch.qytopensource.com:9200"]
+  username: "elastic"
+  password: "Cmhk@94!"
+  ssl.certificate_authorities: ["/usr/share/filebeat/config/certs/ca.cer"]
+  indices:
+    - index: "cisco-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        event.dataset: "cisco"
+    - index: "panw-logs-%{+yyyy.MM.dd}"
+      when.contains:
+        event.dataset: "panw"
+    - index: "network-logs-%{+yyyy.MM.dd}"
+
+# One template for all vendor indices (cisco-logs-*, panw-logs-*, etc.)
+setup.template.name: "network-logs"
+setup.template.pattern: "*-logs-*"
+setup.ilm.enabled: false

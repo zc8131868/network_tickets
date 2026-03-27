@@ -240,8 +240,12 @@ def _tickets_split_internal(source_ip, destination_ip):
         ####################Taiping big data###############################
         elif source_location == 'PrivateCloud-TP' and destination_location == 'PrivateCloud-TP':
             return f'{source_ip} belongs to PrivateCloud-TP, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud'
+        elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud-TP':
+            return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     ###############################################################
     ##########################VPN##########################################
+        # elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud-TP':
+        #     return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to PrivateCloud-TP. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
         elif source_location == 'SZ-VPN' and destination_location == 'PrivateCloud':
             return f'{source_ip} belongs to SZ-VPN, {destination_ip} belongs to Private Cloud. Tickets contain: \n 1)EOMS-Cloud \n 2)ITSR'
     ##############################################################

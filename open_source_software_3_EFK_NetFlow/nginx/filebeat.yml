@@ -1,0 +1,21 @@
+# /etc/filebeat/modules.d下的nginx.yml,只需要去掉disabled即可
+# 路径: /etc/filebeat
+filebeat.config:
+  modules:
+    path: ${path.config}/modules.d/*.yml
+    reload.enabled: false
+
+processors:
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+
+output.elasticsearch:
+  hosts: ["https://elasticsearch.qytopensource.com:9200"]
+  index: qytang-nginx-%{+yyyy.MM.dd}
+  username: "elastic"
+  password: "Cisc0123"
+  ssl.certificate_authorities: ["/usr/share/filebeat/config/certs/ca.cer"]
+
+setup.template.name: "qytang-nginx"
+setup.template.pattern: "qytang-nginx-*"
+setup.ilm.enabled: false

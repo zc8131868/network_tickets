@@ -24,6 +24,7 @@ from auto_tickets.views.qyt_department_addstudent import single_split
 from auto_tickets.views.multi_split import (
     multi_split, api_create_eoms_ticket, api_check_ticket_status,
     api_create_itsr_ticket, api_submit_itsr_sms, api_check_itsr_create_status,
+    api_create_eoms_ticket_v2,
 )
 from auto_tickets.views.download_ITSRsample import download_ITSRsample
 from auto_tickets.views.ip_application import ip_application
@@ -52,6 +53,7 @@ from auto_tickets.views.itsr_close_api import (
     cancel_session_api,
     update_itsr_status_api
 )
+from auto_tickets.views.syslog_api import syslog_search_api
 
 
 
@@ -66,6 +68,7 @@ urlpatterns = [
     path('single_split/', single_split, name='single_split'),
     path('multi_split/', multi_split, name='multi_split'),
     path('api/create_eoms_ticket/', api_create_eoms_ticket, name='api_create_eoms_ticket'),
+    path('api/create_eoms_ticket_v2/', api_create_eoms_ticket_v2, name='api_create_eoms_ticket_v2'),
     path('api/check_ticket_status/<str:task_id>/', api_check_ticket_status, name='api_check_ticket_status'),
     # ITSR Create API endpoints
     path('api/create_itsr_ticket/', api_create_itsr_ticket, name='api_create_itsr_ticket'),
@@ -101,6 +104,8 @@ urlpatterns = [
     path('api/itsr_close/session_status/', get_session_status_api, name='itsr_close_session_status'),
     path('api/itsr_close/cancel_session/', cancel_session_api, name='itsr_close_cancel_session'),
     path('api/itsr_close/update_itsr_status/', update_itsr_status_api, name='itsr_close_update_itsr_status'),
+    # Syslog search API (Elasticsearch) — used by OpenClaw
+    path('api/openclaw/syslogs/search/', syslog_search_api, name='syslog_search_api'),
 ]
 
 

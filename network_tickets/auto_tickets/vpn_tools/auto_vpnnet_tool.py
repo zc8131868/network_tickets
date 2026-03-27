@@ -101,7 +101,7 @@ def create_vpn_access_policy_tool(wb):
             row_errors.append(error_msg)
 
         if protocol is not None:
-            for i in re.split(pattern, protocol.lower()):
+            for i in re.split(pattern, str(protocol).lower()):
                 try:
                     cleaned_protocol = re.sub(r'[\s\u200b]+', '', i)
                     if cleaned_protocol:

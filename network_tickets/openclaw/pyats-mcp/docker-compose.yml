@@ -1,0 +1,24 @@
+services:
+  pyats-mcp:
+    build: .
+    image: pyats-mcp-sse:latest
+    container_name: pyats-mcp
+    environment:
+      PYATS_TESTBED_PATH: /app/testbed.yaml
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8765"
+    ports:
+      - "8765:8765"
+    networks:
+      - openclaw_default
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/sse', timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  openclaw_default:
+    external: true

@@ -325,13 +325,14 @@
                 
                 <div class="row form-row">
                     <div class="col-12">
-                        <label for="{{ form.file.id_for_label }}" class="form-label">
-                            <i class="fas fa-file-upload me-2"></i>{{ form.file.label }}
+                        <label for="{{ form.files.id_for_label }}" class="form-label">
+                            <i class="fas fa-file-upload me-2"></i>{{ form.files.label }}
                         </label>
-                        {{ form.file }}
-                        {% if form.file.errors %}
-                            <div class="invalid-feedback">
-                                {% for error in form.file.errors %}
+                        {{ form.files }}
+                        <div class="form-text text-muted mt-1">Optional. Select one or more files (Ctrl/Cmd+click or Shift+click). Up to 25 files.</div>
+                        {% if form.files.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.files.errors %}
                                     {{ error }}
                                 {% endfor %}
                             </div>
