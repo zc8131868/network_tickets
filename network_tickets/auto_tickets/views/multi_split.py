@@ -376,6 +376,26 @@ def _sanitize_upload_basename(name):
     return base[:180] if len(base) > 180 else base
 
 
+def _build_limited_attachment_name(prefix, session_id, safe_name, max_len=100):
+    """
+    Build an attachment filename capped by ITSR attachment-name limit.
+    """
+    candidate = f'{prefix}_{session_id}_{safe_name}'
+    if len(candidate) <= max_len:
+        return candidate
+
+    root, ext = os.path.splitext(safe_name)
+    if not ext:
+        ext = '.xlsx'
+    fixed_prefix = f'{prefix}_{session_id}_'
+    budget = max_len - len(fixed_prefix) - len(ext)
+    if budget < 1:
+        # Extreme fallback (should not happen with current prefixes/session IDs)
+        return f'{prefix}_{session_id}{ext}'[:max_len]
+    trimmed_root = (root or 'file')[:budget]
+    return f'{fixed_prefix}{trimmed_root}{ext}'
+
+
 def _save_itsr_original_upload(uploaded_file, processing_session_id):
     """
     Save the user's workbook next to the generated ITSR xlsx so BPM can attach both.
@@ -386,7 +406,7 @@ def _save_itsr_original_upload(uploaded_file, processing_session_id):
     if not any(safe.lower().endswith(ext) for ext in ('.xlsx', '.xls', '.xlsm')):
         root, ext = os.path.splitext(safe)
         safe = (root or 'upload') + (ext if ext else '.xlsx')
-    unique_filename = f'original_{processing_session_id}_{safe}'
+    unique_filename = _build_limited_attachment_name('original', processing_session_id, safe)
     unique_path = os.path.join(ITSR_SESSION_DIR, unique_filename)
     try:
         uploaded_file.seek(0)
@@ -396,6 +416,43 @@ def _save_itsr_original_upload(uploaded_file, processing_session_id):
         return os.path.abspath(unique_path)
     except OSError:
         logger.warning('Could not save ITSR original upload copy', exc_info=True)
+        return None
+
+
+def _save_vpn_consolidated_upload(sheet, consolidated_rows, processing_session_id, upload_name):
+    """
+    Save a consolidated VPN workbook (rows merged by E+D+F) for ITSR attachment use.
+    """
+    _ensure_itsr_session_dir()
+    safe = _sanitize_upload_basename(upload_name or 'vpn_consolidated.xlsx')
+    if not any(safe.lower().endswith(ext) for ext in ('.xlsx', '.xls', '.xlsm')):
+        root, ext = os.path.splitext(safe)
+        safe = (root or 'vpn_consolidated') + (ext if ext else '.xlsx')
+    unique_filename = _build_limited_attachment_name('original_processed', processing_session_id, safe)
+    unique_path = os.path.join(ITSR_SESSION_DIR, unique_filename)
+
+    wb_out = openpyxl.Workbook()
+    ws_out = wb_out.active
+
+    # Keep the same first three rows as source sheet (headers/example rows).
+    for r in range(1, 4):
+        for c in range(1, 9):
+            ws_out.cell(row=r, column=c).value = sheet.cell(row=r, column=c).value
+
+    for idx, row_data in enumerate(consolidated_rows, start=4):
+        ws_out.cell(row=idx, column=1).value = idx - 3
+        ws_out.cell(row=idx, column=2).value = row_data.get('destination_ip', '')
+        ws_out.cell(row=idx, column=3).value = row_data.get('description', '')
+        ws_out.cell(row=idx, column=4).value = row_data.get('protocol', '')
+        ws_out.cell(row=idx, column=5).value = row_data.get('port', '')
+        ws_out.cell(row=idx, column=6).value = row_data.get('vendor', '')
+        ws_out.cell(row=idx, column=7).value = row_data.get('staff_number', '')
+
+    try:
+        wb_out.save(unique_path)
+        return os.path.abspath(unique_path)
+    except OSError:
+        logger.warning('Could not save consolidated VPN upload copy', exc_info=True)
         return None
 
 
@@ -444,92 +501,256 @@ def _process_itsr_file(sheet):
     ticket_title = ''
     title_col = _find_ticket_title_column_1based(sheet, 9)
 
+    def _norm_text(value):
+        return str(value or '').replace('\u200b', '').strip()
+
+    def _norm_list(value):
+        items = [_norm_text(item) for item in re.split(pattern, str(value or ''))]
+        return [x for x in items if x]
+
+    def _stable_unique(items):
+        out = []
+        seen = set()
+        for item in items:
+            if item not in seen:
+                seen.add(item)
+                out.append(item)
+        return out
+
+    def _norm_key(values, lower=False):
+        if lower:
+            values = [v.lower() for v in values]
+        return tuple(sorted(values))
+
+    class _DisjointSet:
+        def __init__(self, size):
+            self.parent = list(range(size))
+            self.rank = [0] * size
+
+        def find(self, x):
+            while self.parent[x] != x:
+                self.parent[x] = self.parent[self.parent[x]]
+                x = self.parent[x]
+            return x
+
+        def union(self, a, b):
+            ra = self.find(a)
+            rb = self.find(b)
+            if ra == rb:
+                return
+            if self.rank[ra] < self.rank[rb]:
+                self.parent[ra] = rb
+            elif self.rank[ra] > self.rank[rb]:
+                self.parent[rb] = ra
+            else:
+                self.parent[rb] = ra
+                self.rank[ra] += 1
+
+    parsed_rows = []
+
     for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=9), start=4):
         try:
-            if row[2].value and row[4].value and row[5].value and row[6].value:
-                source_name = str(row[1].value).strip() if row[1].value else ''
-                source_ip_list = [item for item in re.split(pattern, str(row[2].value)) if item.strip()]
-                dest_name = str(row[3].value).strip() if row[3].value else ''
-                destination_ip_list = [item for item in re.split(pattern, str(row[4].value)) if item.strip()]
-                destination_port_list = [item for item in re.split(pattern, str(row[5].value)) if item.strip()]
-                protocol_list = [item for item in re.split(pattern, str(row[6].value)) if item.strip()]
-                requestor_list = [item for item in re.split(pattern, str(row[7].value if row[7].value else '')) if item.strip()]
-                if requestor_list and not staff_number:
-                    staff_number = requestor_list[0]
-                tv = sheet.cell(row=row_num, column=title_col).value
-                if tv is not None and str(tv).strip() and not ticket_title:
-                    ticket_title = str(tv).strip()
-                for i in source_ip_list:
-                    source_ip = i.strip().replace('\u200b', '')
-                    judge_source_ip = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', source_ip)
-                    if judge_source_ip:
-                        for destination_ip in destination_ip_list:
-                            destination_ip = destination_ip.strip().replace('\u200b', '')
-                            judge_destination_ip = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', destination_ip)
-                            if judge_destination_ip:
-                                try:
-                                    ticket_list = tickets_split(source_ip, destination_ip, return_list=True)
-                                    needs_cloud, needs_sn = _check_cloud_sn(ticket_list)
-                                    needs_itsr = _check_itsr(ticket_list)
-                                    if needs_cloud:
-                                        detected_cloud = True
-                                    if needs_sn:
-                                        detected_sn = True
-                                    if needs_itsr:
-                                        detected_itsr = True
+            if not (row[2].value and row[4].value and row[5].value and row[6].value):
+                continue
 
-                                    sorted_ports = sorted(destination_port_list)
-                                    sorted_protocols = sorted(protocol_list)
-                                    unique_key = f"{source_ip}_{destination_ip}_{','.join(sorted_protocols)}_{','.join(sorted_ports)}"
+            source_name = _norm_text(row[1].value)
+            source_ip_list = _stable_unique(_norm_list(row[2].value))
+            dest_name = _norm_text(row[3].value)
+            destination_ip_list = _stable_unique(_norm_list(row[4].value))
+            destination_port_list = _stable_unique(_norm_list(row[5].value))
+            protocol_list = _stable_unique(_norm_list(row[6].value))
+            requestor_list = _stable_unique(_norm_list(row[7].value))
 
-                                    if needs_cloud and unique_key not in cloud_processed_pairs:
-                                        cloud_source_name_dic[cloud_num] = source_name
-                                        cloud_sip_dic[cloud_num] = source_ip
-                                        cloud_dest_name_dic[cloud_num] = dest_name
-                                        cloud_dip_dic[cloud_num] = destination_ip
-                                        cloud_dport_dic[cloud_num] = destination_port_list
-                                        cloud_protocol_dic[cloud_num] = protocol_list
-                                        cloud_requestor_dic[cloud_num] = requestor_list[0] if requestor_list else ''
-                                        cloud_processed_pairs.add(unique_key)
-                                        cloud_num += 1
+            if requestor_list and not staff_number:
+                staff_number = requestor_list[0]
 
-                                    if needs_sn and unique_key not in sn_processed_pairs:
-                                        sn_source_name_dic[sn_num] = source_name
-                                        sn_sip_dic[sn_num] = source_ip
-                                        sn_dest_name_dic[sn_num] = dest_name
-                                        sn_dip_dic[sn_num] = destination_ip
-                                        sn_dport_dic[sn_num] = destination_port_list
-                                        sn_protocol_dic[sn_num] = protocol_list
-                                        sn_requestor_dic[sn_num] = requestor_list[0] if requestor_list else ''
-                                        sn_processed_pairs.add(unique_key)
-                                        sn_num += 1
+            tv = sheet.cell(row=row_num, column=title_col).value
+            if tv is not None and str(tv).strip() and not ticket_title:
+                ticket_title = str(tv).strip()
 
-                                    if needs_itsr and unique_key not in itsr_processed_pairs:
-                                        itsr_source_name_dic[itsr_num] = source_name
-                                        itsr_sip_dic[itsr_num] = source_ip
-                                        itsr_dest_name_dic[itsr_num] = dest_name
-                                        itsr_dip_dic[itsr_num] = destination_ip
-                                        itsr_dport_dic[itsr_num] = destination_port_list
-                                        itsr_protocol_dic[itsr_num] = protocol_list
-                                        itsr_requestor_dic[itsr_num] = requestor_list[0] if requestor_list else ''
-                                        itsr_processed_pairs.add(unique_key)
-                                        itsr_num += 1
-
-                                    result_str = tickets_split(source_ip, destination_ip, return_list=False)
-                                    result_list.append(result_str)
-
-                                except Exception as e:
-                                    error_msg = f"ERROR: Row {row_num} - Failed to process {source_ip} to {destination_ip}: {str(e)}"
-                                    result_list.append(error_msg)
-                            else:
-                                error_msg = f"ERROR: Row {row_num} - Invalid destination IP format: {destination_ip}"
-                                result_list.append(error_msg)
-                    else:
-                        error_msg = f"ERROR: Row {row_num} - Invalid source IP format: {source_ip}"
-                        result_list.append(error_msg)
+            parsed_rows.append({
+                'row_num': row_num,
+                'source_name': source_name,
+                'source_ip_list': source_ip_list,
+                'dest_name': dest_name,
+                'destination_ip_list': destination_ip_list,
+                'destination_port_list': destination_port_list,
+                'protocol_list': protocol_list,
+                'requestor_list': requestor_list,
+                'cfg_key': (
+                    _norm_key(source_ip_list, lower=True),
+                    _norm_key(destination_port_list, lower=True),
+                    _norm_key(protocol_list, lower=True),
+                ),
+                'efg_key': (
+                    _norm_key(destination_ip_list, lower=True),
+                    _norm_key(destination_port_list, lower=True),
+                    _norm_key(protocol_list, lower=True),
+                ),
+            })
         except Exception as e:
             error_msg = f"ERROR: Row {row_num} - Error processing row: {str(e)}"
             result_list.append(error_msg)
+
+    if parsed_rows:
+        dsu = _DisjointSet(len(parsed_rows))
+        cfg_seen = {}
+        efg_seen = {}
+
+        for idx, row_data in enumerate(parsed_rows):
+            cfg_key = row_data['cfg_key']
+            efg_key = row_data['efg_key']
+
+            if cfg_key in cfg_seen:
+                dsu.union(idx, cfg_seen[cfg_key])
+            else:
+                cfg_seen[cfg_key] = idx
+
+            if efg_key in efg_seen:
+                dsu.union(idx, efg_seen[efg_key])
+            else:
+                efg_seen[efg_key] = idx
+
+        grouped_rows = {}
+        for idx, row_data in enumerate(parsed_rows):
+            root = dsu.find(idx)
+            grouped_rows.setdefault(root, []).append(row_data)
+
+        consolidated_rows = []
+        for group in grouped_rows.values():
+            group = sorted(group, key=lambda x: x['row_num'])
+
+            source_name = ''
+            dest_name = ''
+            requestor = ''
+            source_ips = []
+            destination_ips = []
+            destination_ports = []
+            protocols = []
+            row_numbers = []
+
+            for item in group:
+                row_numbers.append(item['row_num'])
+                source_ips.extend(item['source_ip_list'])
+                destination_ips.extend(item['destination_ip_list'])
+                destination_ports.extend(item['destination_port_list'])
+                protocols.extend(item['protocol_list'])
+
+                if not source_name and item['source_name']:
+                    source_name = item['source_name']
+                if not dest_name and item['dest_name']:
+                    dest_name = item['dest_name']
+                if not requestor and item['requestor_list']:
+                    requestor = item['requestor_list'][0]
+
+            consolidated_rows.append({
+                'row_numbers': row_numbers,
+                'source_name': source_name,
+                'source_ip_list': _stable_unique(source_ips),
+                'dest_name': dest_name,
+                'destination_ip_list': _stable_unique(destination_ips),
+                'destination_port_list': _stable_unique(destination_ports),
+                'protocol_list': _stable_unique(protocols),
+                'requestor': requestor,
+            })
+
+        for item in sorted(consolidated_rows, key=lambda x: min(x['row_numbers'])):
+            source_name = item['source_name']
+            source_ip_list = item['source_ip_list']
+            dest_name = item['dest_name']
+            destination_ip_list = item['destination_ip_list']
+            destination_port_list = item['destination_port_list']
+            protocol_list = item['protocol_list']
+            requestor = item['requestor']
+            row_label = ','.join(str(x) for x in item['row_numbers'])
+
+            group_needs_cloud = False
+            group_needs_sn = False
+            group_needs_itsr = False
+            valid_source_ips = []
+            valid_destination_ips = []
+
+            for i in source_ip_list:
+                source_ip = i.strip().replace('\u200b', '')
+                judge_source_ip = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', source_ip)
+                if judge_source_ip:
+                    valid_source_ips.append(source_ip)
+                    for destination_ip in destination_ip_list:
+                        destination_ip = destination_ip.strip().replace('\u200b', '')
+                        judge_destination_ip = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', destination_ip)
+                        if judge_destination_ip:
+                            valid_destination_ips.append(destination_ip)
+                            try:
+                                ticket_list = tickets_split(source_ip, destination_ip, return_list=True)
+                                needs_cloud, needs_sn = _check_cloud_sn(ticket_list)
+                                needs_itsr = _check_itsr(ticket_list)
+                                if needs_cloud:
+                                    detected_cloud = True
+                                    group_needs_cloud = True
+                                if needs_sn:
+                                    detected_sn = True
+                                    group_needs_sn = True
+                                if needs_itsr:
+                                    detected_itsr = True
+                                    group_needs_itsr = True
+
+                                result_str = tickets_split(source_ip, destination_ip, return_list=False)
+                                result_list.append(result_str)
+
+                            except Exception as e:
+                                error_msg = f"ERROR: Row(s) {row_label} - Failed to process {source_ip} to {destination_ip}: {str(e)}"
+                                result_list.append(error_msg)
+                        else:
+                            error_msg = f"ERROR: Row(s) {row_label} - Invalid destination IP format: {destination_ip}"
+                            result_list.append(error_msg)
+                else:
+                    error_msg = f"ERROR: Row(s) {row_label} - Invalid source IP format: {source_ip}"
+                    result_list.append(error_msg)
+
+            sorted_ports = sorted(destination_port_list)
+            sorted_protocols = sorted(protocol_list)
+            group_key = (
+                tuple(sorted(_stable_unique(valid_source_ips))),
+                tuple(sorted(_stable_unique(valid_destination_ips))),
+                tuple(x.lower() for x in sorted_ports),
+                tuple(x.lower() for x in sorted_protocols),
+            )
+
+            consolidated_source = '\n'.join(_stable_unique(valid_source_ips))
+            consolidated_destination = '\n'.join(_stable_unique(valid_destination_ips))
+
+            if group_needs_cloud and group_key not in cloud_processed_pairs:
+                cloud_source_name_dic[cloud_num] = source_name
+                cloud_sip_dic[cloud_num] = consolidated_source
+                cloud_dest_name_dic[cloud_num] = dest_name
+                cloud_dip_dic[cloud_num] = consolidated_destination
+                cloud_dport_dic[cloud_num] = destination_port_list
+                cloud_protocol_dic[cloud_num] = protocol_list
+                cloud_requestor_dic[cloud_num] = requestor
+                cloud_processed_pairs.add(group_key)
+                cloud_num += 1
+
+            if group_needs_sn and group_key not in sn_processed_pairs:
+                sn_source_name_dic[sn_num] = source_name
+                sn_sip_dic[sn_num] = consolidated_source
+                sn_dest_name_dic[sn_num] = dest_name
+                sn_dip_dic[sn_num] = consolidated_destination
+                sn_dport_dic[sn_num] = destination_port_list
+                sn_protocol_dic[sn_num] = protocol_list
+                sn_requestor_dic[sn_num] = requestor
+                sn_processed_pairs.add(group_key)
+                sn_num += 1
+
+            if group_needs_itsr and group_key not in itsr_processed_pairs:
+                itsr_source_name_dic[itsr_num] = source_name
+                itsr_sip_dic[itsr_num] = consolidated_source
+                itsr_dest_name_dic[itsr_num] = dest_name
+                itsr_dip_dic[itsr_num] = consolidated_destination
+                itsr_dport_dic[itsr_num] = destination_port_list
+                itsr_protocol_dic[itsr_num] = protocol_list
+                itsr_requestor_dic[itsr_num] = requestor
+                itsr_processed_pairs.add(group_key)
+                itsr_num += 1
 
     return {
         'result_list': result_list,
@@ -608,7 +829,30 @@ def _process_vpn_file(sheet):
     itsr_processed_pairs = set()
     staff_number = ''
     ticket_title = ''
-    title_col = _find_ticket_title_column_1based(sheet, 8)
+    consolidated_rows = []
+    grouped_rows = {}
+
+    def _norm_text(value):
+        return str(value or '').replace('\u200b', '').strip()
+
+    def _norm_list(value):
+        items = [_norm_text(item) for item in re.split(pattern, str(value or ''))]
+        return [x for x in items if x]
+
+    def _stable_unique(items):
+        out = []
+        seen = set()
+        for item in items:
+            if item not in seen:
+                seen.add(item)
+                out.append(item)
+        return out
+
+    def _group_key(proto_raw, port_raw, vendor_raw):
+        proto_norm = tuple(sorted(x.lower() for x in _norm_list(proto_raw)))
+        port_norm = tuple(sorted(x.lower() for x in _norm_list(port_raw)))
+        vendor_norm = _norm_text(vendor_raw).lower()
+        return (port_norm, proto_norm, vendor_norm)
 
     for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=8), start=4):
         try:
@@ -616,85 +860,113 @@ def _process_vpn_file(sheet):
             if not (row[1].value and row[3].value and row[4].value):
                 continue
 
-            destination_ip_list = [item for item in re.split(pattern, str(row[1].value)) if item.strip()]
-            dest_name = str(row[2].value).strip() if row[2].value else ''
-            protocol_list = [item for item in re.split(pattern, str(row[3].value)) if item.strip()]
-            destination_port_list = [item for item in re.split(pattern, str(row[4].value)) if item.strip()]
-            # Column G (index 6): Staff Number (requestor/originator)
-            row_staff = str(row[6].value).strip() if row[6].value else ''
-            if row_staff and not staff_number:
-                staff_number = row_staff
-            tv = sheet.cell(row=row_num, column=title_col).value
-            if tv is not None and str(tv).strip() and not ticket_title:
-                ticket_title = str(tv).strip()
+            key = _group_key(row[3].value, row[4].value, row[5].value)
+            group = grouped_rows.get(key)
+            if group is None:
+                group = {
+                    'row_numbers': [row_num],
+                    'destination_ips': _norm_list(row[1].value),
+                    'descriptions': [_norm_text(row[2].value)] if _norm_text(row[2].value) else [],
+                    'protocol_list': _stable_unique(_norm_list(row[3].value)),
+                    'destination_port_list': _stable_unique(_norm_list(row[4].value)),
+                    'vendor_name': _norm_text(row[5].value),
+                    'staff_number': _norm_text(row[6].value),
+                }
+                grouped_rows[key] = group
+            else:
+                group['row_numbers'].append(row_num)
+                group['destination_ips'].extend(_norm_list(row[1].value))
+                if _norm_text(row[2].value):
+                    group['descriptions'].append(_norm_text(row[2].value))
+                if not group['staff_number']:
+                    group['staff_number'] = _norm_text(row[6].value)
 
-            for destination_ip_raw in destination_ip_list:
-                destination_ip = destination_ip_raw.strip().replace('\u200b', '')
-                judge_destination_ip = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', destination_ip)
-                if not judge_destination_ip:
-                    error_msg = f"ERROR: Row {row_num} - Invalid destination IP format: {destination_ip}"
-                    result_list.append(error_msg)
-                    continue
-
-                for source_ip in VPN_SOURCE_IPS:
-                    try:
-                        ticket_list = tickets_split(source_ip, destination_ip, return_list=True)
-                        needs_cloud, needs_sn = _check_cloud_sn(ticket_list)
-                        needs_itsr = _check_itsr(ticket_list)
-                        if needs_cloud:
-                            detected_cloud = True
-                        if needs_sn:
-                            detected_sn = True
-                        if needs_itsr:
-                            detected_itsr = True
-
-                        sorted_ports = sorted(destination_port_list)
-                        sorted_protocols = sorted(protocol_list)
-                        unique_key = f"{source_ip}_{destination_ip}_{','.join(sorted_protocols)}_{','.join(sorted_ports)}"
-
-                        if needs_cloud and unique_key not in cloud_processed_pairs:
-                            cloud_source_name_dic[cloud_num] = 'VPN System'
-                            cloud_sip_dic[cloud_num] = source_ip
-                            cloud_dest_name_dic[cloud_num] = dest_name
-                            cloud_dip_dic[cloud_num] = destination_ip
-                            cloud_dport_dic[cloud_num] = destination_port_list
-                            cloud_protocol_dic[cloud_num] = protocol_list
-                            cloud_requestor_dic[cloud_num] = staff_number
-                            cloud_processed_pairs.add(unique_key)
-                            cloud_num += 1
-
-                        if needs_sn and unique_key not in sn_processed_pairs:
-                            sn_source_name_dic[sn_num] = 'VPN System'
-                            sn_sip_dic[sn_num] = source_ip
-                            sn_dest_name_dic[sn_num] = dest_name
-                            sn_dip_dic[sn_num] = destination_ip
-                            sn_dport_dic[sn_num] = destination_port_list
-                            sn_protocol_dic[sn_num] = protocol_list
-                            sn_requestor_dic[sn_num] = staff_number
-                            sn_processed_pairs.add(unique_key)
-                            sn_num += 1
-
-                        if needs_itsr and unique_key not in itsr_processed_pairs:
-                            itsr_source_name_dic[itsr_num] = 'VPN System'
-                            itsr_sip_dic[itsr_num] = source_ip
-                            itsr_dest_name_dic[itsr_num] = dest_name
-                            itsr_dip_dic[itsr_num] = destination_ip
-                            itsr_dport_dic[itsr_num] = destination_port_list
-                            itsr_protocol_dic[itsr_num] = protocol_list
-                            itsr_requestor_dic[itsr_num] = staff_number
-                            itsr_processed_pairs.add(unique_key)
-                            itsr_num += 1
-
-                        result_str = tickets_split(source_ip, destination_ip, return_list=False)
-                        result_list.append(result_str)
-
-                    except Exception as e:
-                        error_msg = f"ERROR: Row {row_num} - Failed to process {source_ip} to {destination_ip}: {str(e)}"
-                        result_list.append(error_msg)
-
+            if not staff_number and _norm_text(row[6].value):
+                staff_number = _norm_text(row[6].value)
         except Exception as e:
             error_msg = f"ERROR: Row {row_num} - Error processing row: {str(e)}"
             result_list.append(error_msg)
+
+    for _, group in grouped_rows.items():
+        destination_ip_list = _stable_unique(group['destination_ips'])
+        dest_name = '\n'.join(_stable_unique(group['descriptions']))
+        protocol_list = group['protocol_list']
+        destination_port_list = group['destination_port_list']
+        group_row_label = ','.join(str(x) for x in group['row_numbers'])
+        requestor = group['staff_number'] or staff_number
+
+        consolidated_rows.append({
+            'destination_ip': '\n'.join(destination_ip_list),
+            'description': dest_name,
+            'protocol': '\n'.join(protocol_list),
+            'port': '\n'.join(destination_port_list),
+            'vendor': group['vendor_name'],
+            'staff_number': requestor,
+        })
+
+        for destination_ip_raw in destination_ip_list:
+            destination_ip = destination_ip_raw.strip().replace('\u200b', '')
+            judge_destination_ip = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', destination_ip)
+            if not judge_destination_ip:
+                error_msg = f"ERROR: Row(s) {group_row_label} - Invalid destination IP format: {destination_ip}"
+                result_list.append(error_msg)
+                continue
+
+            for source_ip in VPN_SOURCE_IPS:
+                try:
+                    ticket_list = tickets_split(source_ip, destination_ip, return_list=True)
+                    needs_cloud, needs_sn = _check_cloud_sn(ticket_list)
+                    needs_itsr = _check_itsr(ticket_list)
+                    if needs_cloud:
+                        detected_cloud = True
+                    if needs_sn:
+                        detected_sn = True
+                    if needs_itsr:
+                        detected_itsr = True
+
+                    sorted_ports = sorted(destination_port_list)
+                    sorted_protocols = sorted(protocol_list)
+                    unique_key = f"{source_ip}_{destination_ip}_{','.join(sorted_protocols)}_{','.join(sorted_ports)}"
+
+                    if needs_cloud and unique_key not in cloud_processed_pairs:
+                        cloud_source_name_dic[cloud_num] = 'VPN System'
+                        cloud_sip_dic[cloud_num] = source_ip
+                        cloud_dest_name_dic[cloud_num] = dest_name
+                        cloud_dip_dic[cloud_num] = destination_ip
+                        cloud_dport_dic[cloud_num] = destination_port_list
+                        cloud_protocol_dic[cloud_num] = protocol_list
+                        cloud_requestor_dic[cloud_num] = requestor
+                        cloud_processed_pairs.add(unique_key)
+                        cloud_num += 1
+
+                    if needs_sn and unique_key not in sn_processed_pairs:
+                        sn_source_name_dic[sn_num] = 'VPN System'
+                        sn_sip_dic[sn_num] = source_ip
+                        sn_dest_name_dic[sn_num] = dest_name
+                        sn_dip_dic[sn_num] = destination_ip
+                        sn_dport_dic[sn_num] = destination_port_list
+                        sn_protocol_dic[sn_num] = protocol_list
+                        sn_requestor_dic[sn_num] = requestor
+                        sn_processed_pairs.add(unique_key)
+                        sn_num += 1
+
+                    if needs_itsr and unique_key not in itsr_processed_pairs:
+                        itsr_source_name_dic[itsr_num] = 'VPN System'
+                        itsr_sip_dic[itsr_num] = source_ip
+                        itsr_dest_name_dic[itsr_num] = dest_name
+                        itsr_dip_dic[itsr_num] = destination_ip
+                        itsr_dport_dic[itsr_num] = destination_port_list
+                        itsr_protocol_dic[itsr_num] = protocol_list
+                        itsr_requestor_dic[itsr_num] = requestor
+                        itsr_processed_pairs.add(unique_key)
+                        itsr_num += 1
+
+                    result_str = tickets_split(source_ip, destination_ip, return_list=False)
+                    result_list.append(result_str)
+
+                except Exception as e:
+                    error_msg = f"ERROR: Row(s) {group_row_label} - Failed to process {source_ip} to {destination_ip}: {str(e)}"
+                    result_list.append(error_msg)
 
     return {
         'result_list': result_list,
@@ -715,6 +987,7 @@ def _process_vpn_file(sheet):
         'itsr_requestor_dic': itsr_requestor_dic,
         'staff_number': staff_number,
         'ticket_title': ticket_title,
+        'consolidated_rows': consolidated_rows,
     }
 
 
@@ -801,10 +1074,14 @@ def multi_split(request):
                         data['itsr_requestor_dic'],
                         session_id=processing_session_id
                     )
-                    # Also persist the workbook the user uploaded (e.g. VPN template) as a second BPM attachment
-                    itsr_original_path = _save_itsr_original_upload(
-                        uploaded_file, processing_session_id
-                    )
+                    # Keep consolidated workbook as second ITSR attachment for VPN-origin tickets.
+                    if file_format == 'vpn':
+                        itsr_original_path = _save_vpn_consolidated_upload(
+                            sheet,
+                            data.get('consolidated_rows', []),
+                            processing_session_id,
+                            uploaded_file.name,
+                        )
 
                 # Check if we got any results
                 if result_list:
@@ -823,6 +1100,7 @@ def multi_split(request):
                     request.session['last_show_cloud_button'] = detected_cloud
                     request.session['last_show_sn_button'] = detected_sn
                     request.session['last_show_itsr_button'] = detected_itsr
+                    request.session['last_file_format'] = file_format
                     # Store first requestor for each department
                     request.session['last_cloud_requestor'] = data['cloud_requestor_dic'].get(4, '') if data['cloud_requestor_dic'] else ''
                     request.session['last_sn_requestor'] = data['sn_requestor_dic'].get(4, '') if data['sn_requestor_dic'] else ''
@@ -865,7 +1143,7 @@ def multi_split(request):
                             'file',
                             'No valid data found in the VPN Excel file. Please check that your file has '
                             'Destination IP in column B, Description in column C, Protocol in column D, '
-                            'Port in column E, Staff Number in column G, and optional Ticket Title in column H '
+                            'Port in column E and Staff Number in column G '
                             'starting from row 4.',
                         )
                     else:
@@ -1278,7 +1556,8 @@ def api_create_itsr_ticket(request):
 
         attachment_paths = [itsr_file_path]
         orig_path = request.session.get('itsr_original_file_path')
-        if orig_path and os.path.exists(orig_path):
+        file_format = (request.session.get('last_file_format') or '').lower()
+        if file_format == 'vpn' and orig_path and os.path.exists(orig_path):
             attachment_paths.append(orig_path)
 
         # 1. Create ITSR session
@@ -1316,6 +1595,7 @@ def api_create_itsr_ticket(request):
                 _cleanup_itsr_session_file(request.session.get('itsr_original_file_path'))
                 request.session.pop('itsr_file_path', None)
                 request.session.pop('itsr_original_file_path', None)
+                request.session.pop('last_file_format', None)
                 request.session.pop('itsr_create_session_id', None)
                 request.session.save()
 
@@ -1382,6 +1662,7 @@ def api_submit_itsr_sms(request):
             _cleanup_itsr_session_file(request.session.get('itsr_original_file_path'))
             request.session.pop('itsr_file_path', None)
             request.session.pop('itsr_original_file_path', None)
+            request.session.pop('last_file_format', None)
             request.session.pop('itsr_create_session_id', None)
             request.session.save()
 

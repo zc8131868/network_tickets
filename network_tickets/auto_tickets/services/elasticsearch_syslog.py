@@ -7,6 +7,7 @@ results that are safe and convenient for both Django views and OpenClaw.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from django.conf import settings
@@ -46,25 +47,61 @@ def _build_query(
         {"range": {"@timestamp": {"gte": start, "lte": end}}},
     ]
     must: list[dict[str, Any]] = []
-    should: list[dict[str, Any]] = []
 
     if query_text:
         must.append({"query_string": {"query": query_text}})
 
     if vendors:
-        for v in vendors:
-            should.append({"term": {"event.module": v}})
+        filters.append(
+            {
+                "bool": {
+                    "should": [{"term": {"event.module": v}} for v in vendors],
+                    "minimum_should_match": 1,
+                }
+            }
+        )
 
     if devices:
+        device_should = []
         for d in devices:
-            should.append({"term": {"host.name.keyword": d}})
-            should.append({"term": {"observer.hostname.keyword": d}})
+            device_should.append({"term": {"host.name.keyword": d}})
+            device_should.append({"term": {"host.hostname.keyword": d}})
+            device_should.append({"term": {"observer.hostname.keyword": d}})
+            device_should.append({"term": {"hostname.keyword": d}})
+            device_should.append({"term": {"host.hostname": d}})
+            device_should.append({"term": {"observer.hostname": d}})
+            device_should.append({"term": {"hostname": d}})
+            device_should.append({"match_phrase": {"host.hostname": d}})
+            device_should.append({"match_phrase": {"observer.hostname": d}})
+            device_should.append({"match_phrase": {"hostname": d}})
+        filters.append(
+            {
+                "bool": {
+                    "should": device_should,
+                    "minimum_should_match": 1,
+                }
+            }
+        )
 
     if ips:
+        ip_should = []
         for ip in ips:
-            should.append({"term": {"host.ip": ip}})
-            should.append({"term": {"observer.ip": ip}})
-            should.append({"term": {"source.ip": ip}})
+            ip_should.append({"term": {"host.ip": ip}})
+            ip_should.append({"term": {"observer.ip": ip}})
+            ip_should.append({"term": {"source.ip": ip}})
+            ip_should.append({"term": {"destination.ip": ip}})
+            ip_should.append({"term": {"source.address": ip}})
+            ip_should.append({"term": {"destination.address": ip}})
+            ip_should.append({"term": {"log.source.address": ip}})
+            ip_should.append({"wildcard": {"log.source.address": f"{ip}:*"}})
+        filters.append(
+            {
+                "bool": {
+                    "should": ip_should,
+                    "minimum_should_match": 1,
+                }
+            }
+        )
 
     return {
         "size": size,
@@ -73,8 +110,10 @@ def _build_query(
             "@timestamp",
             "message",
             "event.original",
+            "hostname",
             "event.module",
             "event.dataset",
+            "event.severity",
             "host.hostname",
             "observer.hostname",
             "host.ip",
@@ -82,13 +121,14 @@ def _build_query(
             "source.ip",
             "source.address",
             "log.level",
+            "log.original",
+            "log.source.address",
+            "syslog.severity_label",
         ],
         "query": {
             "bool": {
                 "filter": filters,
                 "must": must,
-                "should": should,
-                "minimum_should_match": 1 if should else 0,
             }
         },
     }
@@ -108,15 +148,42 @@ def _deep_get(d: dict, dotted_key: str, default=None):
 def _normalise_hit(hit: dict[str, Any]) -> dict[str, Any]:
     src = hit.get("_source", {})
     event = src.get("event", {})
+    log_obj = src.get("log", {}) if isinstance(src.get("log"), dict) else {}
+    syslog_obj = src.get("syslog", {}) if isinstance(src.get("syslog"), dict) else {}
+
+    # PANW logs commonly use "log.source.address" like "10.254.0.15:54152".
+    log_source_address = _deep_get(src, "log.source.address")
+    log_source_ip = None
+    if isinstance(log_source_address, str) and log_source_address:
+        m = re.match(r"^(\d{1,3}(?:\.\d{1,3}){3})", log_source_address)
+        log_source_ip = m.group(1) if m else log_source_address
+
+    message = event.get("original") or src.get("message") or log_obj.get("original")
+    device = (
+        _deep_get(src, "host.hostname")
+        or _deep_get(src, "observer.hostname")
+        or src.get("hostname")
+    )
+    device_ip = (
+        _deep_get(src, "host.ip")
+        or _deep_get(src, "observer.ip")
+        or log_source_ip
+    )
+    severity = (
+        _deep_get(src, "log.level")
+        or syslog_obj.get("severity_label")
+        or event.get("severity")
+    )
+
     return {
         "timestamp": src.get("@timestamp"),
-        "message": event.get("original") or src.get("message"),
+        "message": message,
         "vendor": event.get("module"),
         "dataset": event.get("dataset"),
-        "device": _deep_get(src, "host.hostname") or _deep_get(src, "observer.hostname"),
-        "device_ip": _deep_get(src, "host.ip") or _deep_get(src, "observer.ip"),
-        "source_ip": _deep_get(src, "source.ip"),
-        "severity": _deep_get(src, "log.level"),
+        "device": device,
+        "device_ip": device_ip,
+        "source_ip": _deep_get(src, "source.ip") or _deep_get(src, "source.address"),
+        "severity": severity,
         "index": hit.get("_index"),
         "id": hit.get("_id"),
     }

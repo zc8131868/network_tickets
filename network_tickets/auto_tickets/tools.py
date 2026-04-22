@@ -999,7 +999,7 @@ def auto_tickets_pa_tools(wb, username, password):
         logger.info("Excel file loaded successfully")
         res_log.append("Excel file loaded successfully")
 
-        pattern = r'[ ,\n、，]'
+        pattern = r'[ ,\n、，/]'
 
         start_row = 4
         end_row = sheet.max_row

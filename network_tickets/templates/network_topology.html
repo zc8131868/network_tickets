@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}
+    Network Topology
+{% endblock title %}
+
+{% block body %}
+<div class="page-header animate-fade-in">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-12 text-center">
+                <h1><i class="fas fa-project-diagram me-3"></i>Network Topology</h1>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-4">
+    {% if topology_images %}
+    <div class="row">
+        {% for image in topology_images %}
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-image me-2"></i>{{ image.title }}</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{ image.url }}" target="_blank" rel="noopener noreferrer" class="d-block">
+                        <img src="{{ image.url }}" alt="{{ image.filename }}" class="img-fluid rounded border">
+                    </a>
+                    <p class="text-muted mt-3 mb-0">
+                        <i class="fas fa-file-image me-2"></i>{{ image.filename }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        No PNG files were found in <code>{{ topology_source_path }}</code>.
+    </div>
+    {% endif %}
+</div>
+{% endblock body %}

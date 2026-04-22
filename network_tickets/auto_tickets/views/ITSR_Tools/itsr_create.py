@@ -76,6 +76,12 @@ def _bpm_is_sso_redirect_url(url: str) -> bool:
         return False
 
 
+def _limit_text_len(value: str, max_len: int) -> str:
+    """Return text trimmed to max_len characters."""
+    text = str(value or "")
+    return text[:max_len] if len(text) > max_len else text
+
+
 def _handle_bpm_sso_redirect(page, session_id: str, timeout: int = 20000) -> bool:
     """
     Handle BPM /login/redirect stall: wait for automatic redirect,
@@ -1140,7 +1146,14 @@ class CreateSession:
             for idx, finfo in enumerate(uploaded_files):
                 file_size_kb = float(finfo.get("fileSize", 0)) / 1024
                 file_size_str = f"{file_size_kb:.2f}KB"
-                file_name = finfo.get("fileName", "")
+                file_name_raw = str(finfo.get("fileName", "") or "")
+                file_name = _limit_text_len(file_name_raw, 100)
+                yddfjmc_tail = f"（{file_size_str}）"
+                yddfjmc_name_budget = 100 - len(yddfjmc_tail)
+                if yddfjmc_name_budget < 1:
+                    yddfjmc_name_budget = 1
+                yddfjmc_name = _limit_text_len(file_name, yddfjmc_name_budget)
+                yddfjmc_value = f"{yddfjmc_name}{yddfjmc_tail}"
                 storage_key = finfo.get("storageKey", "")
                 create_time_ms = finfo.get("createTime", int(time.time() * 1000))
 
@@ -1151,7 +1164,7 @@ class CreateSession:
                     "fujiandaxiao": file_size_str,
                     "shangchuanren": self._uid,
                     "fujian": storage_key,
-                    "yddfjmc": f"{file_name}（{file_size_str}）",
+                    "yddfjmc": yddfjmc_value,
                     "draft": False,
                     "parentId": "0",
                     "orderNo": 10000 + idx,

@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import RedirectView
 from views.index import index
 from auto_tickets.views.qyt_department_view_summary import show_ipdb
 from auto_tickets.views.qyt_department_addstudent import single_split
@@ -45,6 +46,7 @@ from auto_tickets.views.download_vpn_sample import download_vpn_sample
 from auto_tickets.views.download_vpn_network_sample import download_vpn_network_sample
 from auto_tickets.views.delete_vendor_vpn_account import delete_vendor_vpn_account
 from auto_tickets.views.tickets_search import tickets_search
+from auto_tickets.views.network_topology import network_topology, network_topology_image
 from auto_tickets.views.itsr_close_api import (
     create_close_session_api,
     submit_credentials_api,
@@ -92,6 +94,9 @@ urlpatterns = [
     path('itsr_token_extractor/', itsr_token_extractor, name='itsr_token_extractor'),
     path('mercury_chat/', mercury_chat_view, name='mercury_chat'),
     path('mercury_chat_api/', mercury_chat_api, name='mercury_chat_api'),
+    path('network_diagram/', RedirectView.as_view(pattern_name='network_topology', permanent=False)),
+    path('network_topology/', network_topology, name='network_topology'),
+    path('network_topology/image/<path:image_path>/', network_topology_image, name='network_topology_image'),
     path('create_vendor_vpn_account/', create_vendor_vpn_account, name='create_vendor_vpn_account'),
     path('download_vpn_sample/', download_vpn_sample, name='download_vpn_sample'),
     path('download_vpn_network_sample/', download_vpn_network_sample, name='download_vpn_network_sample'),
