@@ -3,12 +3,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from auto_tickets.views.forms_ticket_detail_search import TicketDetailSearchForm
 from auto_tickets.models import ITSR_Network
-import os
-from django.conf import settings
-import glob
+from auto_tickets.itsr_file_utils import file_entries_for_ticket, get_itsr_files_dir
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 @login_required
 def ticket_detail_search(request):
@@ -130,37 +129,13 @@ def ticket_detail_search(request):
                 search_type = 'handler'
             
             # Get associated files for each ticket
-            itsr_files_dir = os.path.join(settings.BASE_DIR, 'auto_tickets', 'itsr_files')
+            itsr_files_dir = get_itsr_files_dir()
             tickets_with_files = []
             
             for ticket in tickets:
-                # Find files that start with the ticket number
-                safe_ticket_number = ticket.itsr_ticket_number.replace('/', '_').replace('\\', '_')
-                pattern = os.path.join(itsr_files_dir, f"{safe_ticket_number}_*")
-                matching_files = glob.glob(pattern)
-                
-                # Get file info
-                file_list = []
-                for file_path in matching_files:
-                    if os.path.isfile(file_path):
-                        file_name = os.path.basename(file_path)
-                        file_size = os.path.getsize(file_path)
-                        file_mtime = os.path.getmtime(file_path)
-                        from datetime import datetime
-                        file_date = datetime.fromtimestamp(file_mtime).strftime('%Y-%m-%d %H:%M:%S')
-                        # Get relative path for URL
-                        relative_path = os.path.relpath(file_path, os.path.join(settings.BASE_DIR, 'auto_tickets', 'itsr_files'))
-                        file_list.append({
-                            'name': file_name,
-                            'path': file_path,
-                            'size': file_size,
-                            'date': file_date,
-                            'url_name': file_name  # Use filename for URL
-                        })
-                
                 tickets_with_files.append({
                     'ticket': ticket,
-                    'files': sorted(file_list, key=lambda x: x['date'], reverse=True)
+                    'files': file_entries_for_ticket(itsr_files_dir, ticket),
                 })
             
             context = {
@@ -250,35 +225,13 @@ def ticket_detail_search(request):
                 search_type = 'handler'
             
             # Get associated files
-            itsr_files_dir = os.path.join(settings.BASE_DIR, 'auto_tickets', 'itsr_files')
+            itsr_files_dir = get_itsr_files_dir()
             tickets_with_files = []
             
             for ticket in tickets:
-                safe_ticket_number = ticket.itsr_ticket_number.replace('/', '_').replace('\\', '_')
-                pattern = os.path.join(itsr_files_dir, f"{safe_ticket_number}_*")
-                matching_files = glob.glob(pattern)
-                
-                file_list = []
-                for file_path in matching_files:
-                    if os.path.isfile(file_path):
-                        file_name = os.path.basename(file_path)
-                        file_size = os.path.getsize(file_path)
-                        file_mtime = os.path.getmtime(file_path)
-                        from datetime import datetime
-                        file_date = datetime.fromtimestamp(file_mtime).strftime('%Y-%m-%d %H:%M:%S')
-                        # Get relative path for URL
-                        relative_path = os.path.relpath(file_path, os.path.join(settings.BASE_DIR, 'auto_tickets', 'itsr_files'))
-                        file_list.append({
-                            'name': file_name,
-                            'path': file_path,
-                            'size': file_size,
-                            'date': file_date,
-                            'url_name': file_name  # Use filename for URL
-                        })
-                
                 tickets_with_files.append({
                     'ticket': ticket,
-                    'files': sorted(file_list, key=lambda x: x['date'], reverse=True)
+                    'files': file_entries_for_ticket(itsr_files_dir, ticket),
                 })
             
             context = {

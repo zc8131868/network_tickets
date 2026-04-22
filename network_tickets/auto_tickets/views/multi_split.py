@@ -24,6 +24,7 @@ import logging
 import threading
 import uuid
 import time
+import math
 import shutil
 import os
 import glob as glob_module
@@ -48,8 +49,22 @@ def _eoms_task_row_to_dict(task):
     }
 
 
+def _session_get_ticket_title(django_session_key):
+    """Read Excel-derived ticket title from Django session (works from background thread)."""
+    if not django_session_key:
+        return ''
+    try:
+        from django.contrib.sessions.backends.db import SessionStore
+
+        store = SessionStore(session_key=django_session_key)
+        store.load()
+        return (store.get('last_ticket_title') or '').strip()
+    except Exception:
+        return ''
+
+
 def _eoms_clear_session_cooldown(django_session_key, target_department):
-    """Clear per-dept cooldown so captcha / error retries are not blocked for 30s."""
+    """Clear per-dept EOMS start cooldown (after success, failure, captcha, or exception)."""
     if not django_session_key or not target_department:
         return
     try:
@@ -67,6 +82,25 @@ def _eoms_clear_session_cooldown(django_session_key, target_department):
 # VPN source IP ranges (fixed for all VPN tickets).
 # Both must exist in IPDB with the same location/device (e.g. SZ-VPN, DMZ SW01) or only the one in IPDB will appear in generated ticket files.
 VPN_SOURCE_IPS = ['10.51.203.0/24', '10.51.204.0/24']
+
+
+def _find_ticket_title_column_1based(sheet, default_col):
+    """
+    Locate the "Ticket Title" column (English or Chinese header in row 1 or 2).
+    Falls back to default_col when not found (last column in updated samples).
+    """
+    for r in (1, 2):
+        for c in range(1, 26):
+            raw = sheet.cell(row=r, column=c).value
+            if raw is None:
+                continue
+            v = str(raw).strip()
+            vl = v.lower()
+            if vl == 'ticket title' or 'ticket title' in vl:
+                return c
+            if '工单标题' in v:
+                return c
+    return default_col
 
 
 def _detect_file_format(sheet):
@@ -407,8 +441,10 @@ def _process_itsr_file(sheet):
     sn_processed_pairs = set()
     itsr_processed_pairs = set()
     staff_number = ''
+    ticket_title = ''
+    title_col = _find_ticket_title_column_1based(sheet, 9)
 
-    for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=8), start=4):
+    for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=9), start=4):
         try:
             if row[2].value and row[4].value and row[5].value and row[6].value:
                 source_name = str(row[1].value).strip() if row[1].value else ''
@@ -420,6 +456,9 @@ def _process_itsr_file(sheet):
                 requestor_list = [item for item in re.split(pattern, str(row[7].value if row[7].value else '')) if item.strip()]
                 if requestor_list and not staff_number:
                     staff_number = requestor_list[0]
+                tv = sheet.cell(row=row_num, column=title_col).value
+                if tv is not None and str(tv).strip() and not ticket_title:
+                    ticket_title = str(tv).strip()
                 for i in source_ip_list:
                     source_ip = i.strip().replace('\u200b', '')
                     judge_source_ip = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', source_ip)
@@ -510,6 +549,7 @@ def _process_itsr_file(sheet):
         'itsr_dport_dic': itsr_dport_dic, 'itsr_protocol_dic': itsr_protocol_dic,
         'itsr_requestor_dic': itsr_requestor_dic,
         'staff_number': staff_number,
+        'ticket_title': ticket_title,
     }
 
 
@@ -567,8 +607,10 @@ def _process_vpn_file(sheet):
     sn_processed_pairs = set()
     itsr_processed_pairs = set()
     staff_number = ''
+    ticket_title = ''
+    title_col = _find_ticket_title_column_1based(sheet, 8)
 
-    for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=7), start=4):
+    for row_num, row in enumerate(sheet.iter_rows(min_row=4, max_col=8), start=4):
         try:
             # VPN format: B=Dest IP, D=Protocol, E=Port are required (C=Description is optional)
             if not (row[1].value and row[3].value and row[4].value):
@@ -582,6 +624,9 @@ def _process_vpn_file(sheet):
             row_staff = str(row[6].value).strip() if row[6].value else ''
             if row_staff and not staff_number:
                 staff_number = row_staff
+            tv = sheet.cell(row=row_num, column=title_col).value
+            if tv is not None and str(tv).strip() and not ticket_title:
+                ticket_title = str(tv).strip()
 
             for destination_ip_raw in destination_ip_list:
                 destination_ip = destination_ip_raw.strip().replace('\u200b', '')
@@ -669,6 +714,7 @@ def _process_vpn_file(sheet):
         'itsr_dport_dic': itsr_dport_dic, 'itsr_protocol_dic': itsr_protocol_dic,
         'itsr_requestor_dic': itsr_requestor_dic,
         'staff_number': staff_number,
+        'ticket_title': ticket_title,
     }
 
 
@@ -697,6 +743,7 @@ def multi_split(request):
                 detected_sn = data['detected_sn']
                 detected_itsr = data.get('detected_itsr', False)
                 staff_number = data.get('staff_number', '')
+                ticket_title = (data.get('ticket_title') or '').strip()
 
                 # Opportunistically clean up old session files
                 _cleanup_old_session_files()
@@ -781,6 +828,7 @@ def multi_split(request):
                     request.session['last_sn_requestor'] = data['sn_requestor_dic'].get(4, '') if data['sn_requestor_dic'] else ''
                     # Store staff number (from VPN files)
                     request.session['last_staff_number'] = staff_number
+                    request.session['last_ticket_title'] = ticket_title
                     # Store per-session unique file paths for ticket creation
                     request.session['eoms_cloud_file_path'] = eoms_cloud_path
                     request.session['eoms_sn_file_path'] = eoms_sn_path
@@ -789,8 +837,6 @@ def multi_split(request):
                         request.session['itsr_original_file_path'] = itsr_original_path
                     else:
                         request.session.pop('itsr_original_file_path', None)
-                    # Store uploaded filename for ITSR ticket description
-                    request.session['last_uploaded_filename'] = uploaded_file.name
                     # Clear previous ticket creation state when processing new file
                     request.session.pop('ticket_cloud_created', None)
                     request.session.pop('ticket_sn_created', None)
@@ -813,11 +859,22 @@ def multi_split(request):
                         'file_format': file_format,
                     })
                 else:
-                    # No results found, show error
+                    # No results found — form.file.errors is rendered in the upload card (see multi_split.html)
                     if file_format == 'vpn':
-                        form.add_error('file', 'No valid data found in the VPN Excel file. Please check that your file has Destination IP in column B, Description in column C, Protocol in column D, and Port in column E starting from row 4.')
+                        form.add_error(
+                            'file',
+                            'No valid data found in the VPN Excel file. Please check that your file has '
+                            'Destination IP in column B, Description in column C, Protocol in column D, '
+                            'Port in column E, Staff Number in column G, and optional Ticket Title in column H '
+                            'starting from row 4.',
+                        )
                     else:
-                        form.add_error('file', 'No valid data found in the Excel file. Please check that your file has data in columns C and E starting from row 4.')
+                        form.add_error(
+                            'file',
+                            'No valid data found in the Excel file. Please check that your file has data in '
+                            'columns C–G (source IP, destination IP, port, protocol, staff) starting from row 4, '
+                            'and optional Ticket Title in the last column.',
+                        )
                     return render(request, 'multi_split.html', {'form': form})
             
             except Exception as e:
@@ -859,6 +916,7 @@ def _run_ticket_creation(
 
     close_old_connections()
     try:
+        excel_title = _session_get_ticket_title(django_session_key)
         result = asyncio.run(
             create_ticket(
                 target_department=target_department,
@@ -868,6 +926,7 @@ def _run_ticket_creation(
                 originator=requestor if requestor else None,
                 captcha_code=captcha_code or '',
                 resume_token=resume_token or '',
+                title=excel_title or None,
             )
         )
 
@@ -892,6 +951,8 @@ def _run_ticket_creation(
                 error='',
             )
             _cleanup_session_file(file_path)
+            # Same as error/captcha paths: release cooldown so another EOMS (e.g. after ITSR) is not blocked
+            _eoms_clear_session_cooldown(django_session_key, target_department)
         else:
             EomsTicketCreationTask.objects.filter(task_id=task_id).update(
                 status='error',
@@ -935,6 +996,20 @@ def api_create_eoms_ticket(request):
 
     Form POST (legacy): same field names.
     """
+    try:
+        return _api_create_eoms_ticket_impl(request)
+    except Exception as e:
+        logger.exception('api_create_eoms_ticket failed')
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'An unexpected server error occurred. Refresh the page and try again, or check server logs.',
+            },
+            status=500,
+        )
+
+
+def _api_create_eoms_ticket_impl(request):
     data = _parse_eoms_create_payload(request)
     target_department = (data.get('target_department') or '').strip()
     username = (data.get('username') or '').strip()
@@ -956,8 +1031,10 @@ def api_create_eoms_ticket(request):
     current_time = time.time()
     cooldown_seconds = 30
 
-    if current_time - last_creation_time < cooldown_seconds:
-        remaining_time = int(cooldown_seconds - (current_time - last_creation_time))
+    elapsed = current_time - last_creation_time
+    if elapsed < cooldown_seconds:
+        # ceil avoids "wait 0 seconds" when e.g. 29.9s elapsed (int() would truncate to 0)
+        remaining_time = max(1, int(math.ceil(cooldown_seconds - elapsed)))
         return JsonResponse({
             'success': False,
             'error': f'Please wait {remaining_time} seconds before creating another ticket.',
@@ -1023,24 +1100,34 @@ def api_check_ticket_status(request, task_id):
     Poll background EOMS task status (DB-backed — safe across Gunicorn workers).
     """
     try:
-        row = EomsTicketCreationTask.objects.get(task_id=task_id)
-    except EomsTicketCreationTask.DoesNotExist:
-        return JsonResponse({'success': False, 'error': 'Task not found'}, status=404)
+        try:
+            row = EomsTicketCreationTask.objects.get(task_id=task_id)
+        except EomsTicketCreationTask.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Task not found'}, status=404)
 
-    task = _eoms_task_row_to_dict(row)
+        task = _eoms_task_row_to_dict(row)
 
-    if row.status == 'completed' and row.success:
-        dept_lower = row.department.lower()
-        request.session[f'ticket_{dept_lower}_created'] = True
-        file_key = f'eoms_{dept_lower}_file_path'
-        request.session.pop(file_key, None)
-        request.session.modified = True
-        request.session.save()
+        if row.status == 'completed' and row.success:
+            dept_lower = row.department.lower()
+            request.session[f'ticket_{dept_lower}_created'] = True
+            file_key = f'eoms_{dept_lower}_file_path'
+            request.session.pop(file_key, None)
+            request.session.modified = True
+            request.session.save()
 
-    return JsonResponse({
-        'success': True,
-        'task': task,
-    })
+        return JsonResponse({
+            'success': True,
+            'task': task,
+        })
+    except Exception as e:
+        logger.exception('api_check_ticket_status failed for task_id=%s', task_id)
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Could not read task status. Refresh the page and try again.',
+            },
+            status=500,
+        )
 
 
 @csrf_exempt
@@ -1092,6 +1179,7 @@ def api_create_eoms_ticket_v2(request):
                 'error': 'Session expired or file not found. Please re-upload and process the file.',
             }, status=400)
 
+        excel_title = (request.session.get('last_ticket_title') or '').strip()
         result = asyncio.run(create_ticket(
             target_department=target_department,
             file_path=file_path,
@@ -1100,6 +1188,7 @@ def api_create_eoms_ticket_v2(request):
             originator=requestor if requestor else None,
             captcha_code=captcha_code,
             resume_token=resume_token,
+            title=excel_title or None,
         ))
 
         if result.get('need_captcha'):
@@ -1143,6 +1232,7 @@ def api_create_eoms_ticket_v2(request):
 
 # Fixed ITSR ticket parameters
 ITSR_TICKET_TITLE = "Service Request - Network Policy"
+ITSR_TICKET_DESCRIPTION = "Auto-generated by Netcare"
 ITSR_PRODUCT_LINE_ID = "1254515022491552748"  # ISM (網絡支撐)
 ITSR_URGENCY = "ZHONG"
 ITSR_REQUIREMENT_TYPE = "FEIKAIFAXUQIU"
@@ -1156,8 +1246,8 @@ def api_create_itsr_ticket(request):
     Expects JSON body:
         { "username": "...", "password": "..." }
 
-    The ITSR attachment file path and uploaded filename are taken from the
-    Django session (set during file processing).
+    The ITSR attachment file path is taken from the Django session (set during
+    file processing). Ticket description uses ITSR_TICKET_DESCRIPTION.
 
     Returns:
         - success + needs_sms=false + result data  → ticket created (no SMS)
@@ -1183,7 +1273,8 @@ def api_create_itsr_ticket(request):
                 'error': 'Session expired or ITSR file not found. Please re-upload and process the file.',
             }, status=400)
 
-        uploaded_filename = request.session.get('last_uploaded_filename', 'Network Policy Request')
+        excel_title = (request.session.get('last_ticket_title') or '').strip()
+        itsr_title = excel_title or ITSR_TICKET_TITLE
 
         attachment_paths = [itsr_file_path]
         orig_path = request.session.get('itsr_original_file_path')
@@ -1192,8 +1283,8 @@ def api_create_itsr_ticket(request):
 
         # 1. Create ITSR session
         session_id = itsr_create_ticket_session(
-            title=ITSR_TICKET_TITLE,
-            description=uploaded_filename,
+            title=itsr_title,
+            description=ITSR_TICKET_DESCRIPTION,
             product_line_id=ITSR_PRODUCT_LINE_ID,
             urgency=ITSR_URGENCY,
             requirement_type=ITSR_REQUIREMENT_TYPE,

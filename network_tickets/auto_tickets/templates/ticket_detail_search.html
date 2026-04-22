@@ -899,18 +899,18 @@
                                     </div>
                                     <div class="files-dropdown-menu">
                                         {% if item.files %}
-                                            {% for file in item.files %}
+                                            {% for attachment in item.files %}
                                                 <div class="file-item-compact">
                                                     <div class="file-info-compact">
                                                         <i class="fas fa-file file-icon-compact"></i>
                                                         <div class="file-details-compact">
-                                                            <a href="{% url 'serve_itsr_file' filename=file.name %}" download class="file-name-compact file-download-link" title="{{ file.name }}" onclick="event.stopPropagation();">{{ file.name }}</a>
+                                                            <a href="{% url 'serve_itsr_file' filename=attachment.name %}" download class="file-name-compact file-download-link" title="{{ attachment.name }}" onclick="event.stopPropagation();">{{ attachment.name }}</a>
                                                             <span class="file-meta-compact">
-                                                                {{ file.size|filesizeformat }} • {{ file.date|date:"m/d H:i" }}
+                                                                {{ attachment.size|filesizeformat }} • {{ attachment.date }}
                                                             </span>
                                                         </div>
                                                     </div>
-                                                    <a href="{% url 'serve_itsr_file' filename=file.name %}" download class="btn btn-sm btn-outline-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation();">
+                                                    <a href="{% url 'serve_itsr_file' filename=attachment.name %}" download class="btn btn-sm btn-outline-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation();">
                                                         <i class="fas fa-download"></i>
                                                     </a>
                                                 </div>

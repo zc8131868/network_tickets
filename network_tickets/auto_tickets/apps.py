@@ -4,3 +4,6 @@ from django.apps import AppConfig
 class AutoTicketsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'auto_tickets'
+
+    def ready(self):
+        import auto_tickets.signals  # noqa: F401

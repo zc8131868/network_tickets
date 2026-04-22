@@ -19,15 +19,93 @@ ITSR 工单关闭主模块
 """
 
 import logging
+import re
 import threading
 import time
 import uuid
 import requests
+from urllib.parse import urlparse
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+# BPM may redirect to legacy HK CAS or cmhktry CAS (same IdP family as EOMS Playwright flow)
+_CAS_LOGIN_URL_RE = re.compile(
+    r".*(ncas\.hk\.chinamobile\.com|ncas\.cmhktry\.com).*",
+    re.I,
+)
+
+
+def _bpm_is_unauthenticated_login_url(url: str) -> bool:
+    """bpm.cmhktry.com/login is NOT an SSO success page (no SY_* cookies)."""
+    try:
+        p = urlparse(url)
+        if 'bpm.cmhktry.com' not in (p.netloc or ''):
+            return False
+        path = (p.path or '/').rstrip('/') or '/'
+        return path == '/login' or path.startswith('/login/')
+    except Exception:
+        return False
+
+
+def _try_bpm_sso_from_login_page(page, session_id: str) -> bool:
+    """
+    Many BPM deployments show /login after CAS with a link to CAS/SSO; without a click,
+    SY_ACCESS_TOKEN is never set. Returns True if a control was clicked.
+    """
+    if not _bpm_is_unauthenticated_login_url(page.url):
+        return False
+    href_selectors = (
+        'a[href*="ncas"]',
+        'a[href*="cas/login"]',
+        'a[href*="/cas/"]',
+        'a[href*="sso"]',
+        'a[href*="SSO"]',
+    )
+    for sel in href_selectors:
+        try:
+            loc = page.locator(sel)
+            if loc.count() == 0:
+                continue
+            el = loc.first
+            el.wait_for(state='visible', timeout=4000)
+            logger.info(f"[{session_id}] BPM /login: 点击链接 {sel!r}")
+            el.click(timeout=20000)
+            try:
+                page.wait_for_load_state('domcontentloaded', timeout=60000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1500)
+            return True
+        except Exception as e:
+            logger.debug(f"[{session_id}] BPM /login {sel}: {e}")
+
+    for hint in (
+        '单点登录', '统一认证', '统一登陆', '域登录', '域账号',
+        '企业登录', '企业用户', 'CAS', 'SSO',
+    ):
+        try:
+            pat = re.compile(re.escape(hint), re.I)
+            for role in ('link', 'button'):
+                loc = page.get_by_role(role, name=pat)
+                if loc.count() == 0:
+                    continue
+                el = loc.first
+                el.wait_for(state='visible', timeout=2500)
+                logger.info(f"[{session_id}] BPM /login: 点击 {role} {hint!r}")
+                el.click(timeout=20000)
+                try:
+                    page.wait_for_load_state('domcontentloaded', timeout=60000)
+                except Exception:
+                    pass
+                page.wait_for_timeout(1500)
+                return True
+        except Exception:
+            continue
+    return False
+
 
 # ============================================================================
 # Django cache integration (for multi-worker deployments)
@@ -189,7 +267,7 @@ def get_db_manager():
     global _db_manager
     if _db_manager is None:
         try:
-            from db_manager import DBManager
+            from auto_tickets.views.ITSR_Tools.db_manager import DBManager
             _db_manager = DBManager()
             if _db_manager.test_connection():
                 logger.info("数据库连接成功")
@@ -263,7 +341,13 @@ class CloseSession:
     GRAPHQL_ENDPOINT = f"{BPM_BASE_URL}/service/bpm/graphql"
     # 关单提交 API
     SUBMIT_ENDPOINT = f"{BPM_BASE_URL}/service/bpm/operation/submit"
-    
+
+    # 待办入口（CAS 后若落在 /login，需重新打开此链接完成 SSO）
+    BPM_ENTRY_URL = (
+        "https://bpm.cmhktry.com/main/portal/ctp-affair/affairPendingCenter"
+        "?portletTitle=%E5%BE%85%E8%BE%A6%E4%BA%8B%E9%A0%85"
+    )
+
     # 应用配置
     APP_NAME = "itsr07195287674072066508260"
     ROOT_ENTITY_NAME = "com.seeyon.itsr07195287674072066508260.domain.entity.ITfuwuxuqiu"
@@ -386,14 +470,14 @@ class CloseSession:
         # Legacy path
         return bool(self._sms_event.wait(timeout=timeout))
     
-    def submit_credentials(self, username: str, password: str, timeout: int = 120) -> Tuple[bool, str]:
+    def submit_credentials(self, username: str, password: str, timeout: int = 600) -> Tuple[bool, str]:
         """
         提交账号密码，启动登录流程
         
         Args:
             username: 用户名
             password: 密码
-            timeout: 等待超时（秒）
+            timeout: 等待超时（秒）；SSO+BPM 较慢时需足够长（默认 10 分钟）
         
         Returns:
             (success, message)
@@ -650,13 +734,11 @@ class CloseSession:
             self._context = self._browser.new_context()
             self._page = self._context.new_page()
             
-            bpm_url = "https://bpm.cmhktry.com/main/portal/ctp-affair/affairPendingCenter?portletTitle=%E5%BE%85%E8%BE%A6%E4%BA%8B%E9%A0%85"
-            
             logger.info(f"[{self.session_id}] 访问 BPM...")
-            self._page.goto(bpm_url, wait_until='domcontentloaded', timeout=30000)
+            self._page.goto(self.BPM_ENTRY_URL, wait_until='domcontentloaded', timeout=30000)
             
-            logger.info(f"[{self.session_id}] 等待 CAS...")
-            self._page.wait_for_url("**/ncas.hk.chinamobile.com/**", timeout=30000)
+            logger.info(f"[{self.session_id}] 等待 CAS (hk.chinamobile 或 cmhktry)...")
+            self._page.wait_for_url(_CAS_LOGIN_URL_RE, timeout=60000)
             
             logger.info(f"[{self.session_id}] 填写凭据: {self._username}")
             self._page.fill('input[name="username"]', self._username)
@@ -704,8 +786,6 @@ class CloseSession:
             False: 不需要验证码
         """
         try:
-            from urllib.parse import urlparse
-            
             current_url = self._page.url
             logger.info(f"[{self.session_id}] 当前URL: {current_url}")
             
@@ -714,13 +794,47 @@ class CloseSession:
             hostname = parsed_url.netloc  # 获取主机名部分
             logger.info(f"[{self.session_id}] 主机名: {hostname}")
             
-            # 方法1: 检查 URL 主机名是否是 BPM（不是 CAS）
+            # 方法1: BPM 主机 — 但 /login 不是已登录门户，需等 SSO 或后续恢复
             if "bpm.cmhktry.com" in hostname:
-                logger.info(f"[{self.session_id}] 已跳转到BPM站点，无需验证码")
-                return False
+                if _bpm_is_unauthenticated_login_url(current_url):
+                    logger.info(
+                        f"[{self.session_id}] 当前为 BPM /login，尝试 CAS/统一认证入口…"
+                    )
+                    for _ in range(3):
+                        if not _bpm_is_unauthenticated_login_url(self._page.url):
+                            break
+                        if not _try_bpm_sso_from_login_page(self._page, self.session_id):
+                            break
+                        self._page.wait_for_timeout(2000)
+                    current_url = self._page.url
+                    if _bpm_is_unauthenticated_login_url(current_url):
+                        logger.info(
+                            f"[{self.session_id}] 仍在 BPM /login，等待自动跳转…"
+                        )
+                        try:
+                            self._page.wait_for_function(
+                                """() => {
+                                  const h = window.location.hostname || '';
+                                  const p = window.location.pathname.toLowerCase() || '';
+                                  if (!h.includes('bpm.cmhktry.com')) return true;
+                                  return p !== '/login' && !p.startsWith('/login/');
+                                }""",
+                                timeout=45000,
+                            )
+                        except Exception as e:
+                            logger.warning(
+                                f"[{self.session_id}] 等待离开 BPM /login: {e}"
+                            )
+                    current_url = self._page.url
+                    hostname = urlparse(current_url).netloc
+                if "bpm.cmhktry.com" in hostname and not _bpm_is_unauthenticated_login_url(
+                    current_url
+                ):
+                    logger.info(f"[{self.session_id}] 已跳转到BPM站点，无需验证码")
+                    return False
             
-            # 方法2: 检查是否还在 CAS 页面
-            if "ncas.hk.chinamobile.com" in hostname:
+            # 方法2: 检查是否还在 CAS 页面（两种 IdP 主机名）
+            if "ncas.hk.chinamobile.com" in hostname or "ncas.cmhktry.com" in hostname:
                 # 检查页面上是否有验证码输入框
                 sms_indicators = [
                     '#code_input1',           # 6位验证码输入框
@@ -847,14 +961,27 @@ class CloseSession:
             return False
     
     def _extract_auth(self):
-        """提取认证信息"""
-        cookies = self._context.cookies()
-        for cookie in cookies:
-            if cookie['name'] == 'SY_ACCESS_TOKEN':
-                self._access_token = cookie['value']
-            elif cookie['name'] == 'SY_UID':
-                self._uid = cookie['value']
-        
+        """提取认证信息（合并全局与各域 cookies，含 HttpOnly）"""
+        merged = {}
+        try:
+            for c in self._context.cookies():
+                merged[c['name']] = c['value']
+            for url in (
+                'https://bpm.cmhktry.com/',
+                'https://bpm.cmhktry.com',
+            ):
+                try:
+                    for c in self._context.cookies(urls=[url]):
+                        merged[c['name']] = c['value']
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        if merged.get('SY_ACCESS_TOKEN'):
+            self._access_token = merged['SY_ACCESS_TOKEN']
+        if merged.get('SY_UID'):
+            self._uid = merged['SY_UID']
+
         if not self._access_token or not self._uid:
             try:
                 doc_cookies = self._page.evaluate('document.cookie')
@@ -866,39 +993,105 @@ class CloseSession:
                             self._access_token = val
                         elif key == 'SY_UID':
                             self._uid = val
-            except:
+            except Exception:
                 pass
-    
+
     def _wait_for_auth_complete(self) -> bool:
         """
-        等待认证完成（无需验证码的情况）
-        
-        Returns:
-            True: 认证成功
-            False: 认证失败
+        等待认证完成（无需验证码的情况）。
+        注意：``https://bpm.cmhktry.com/login`` 不是已登录状态，不能匹配泛泛的 bpm/**。
         """
         try:
-            # 快速轮询检测认证 cookies（最多等待 15 秒）
-            for _ in range(30):
+            entry = self.BPM_ENTRY_URL
+            logger.info(f"[{self.session_id}] 等待 SSO / token… URL={self._page.url!r}")
+
+            # 若停在 BPM 登录页，重新打开待办链接触发 SSO（最多 2 次）
+            for recovery in range(2):
+                if _bpm_is_unauthenticated_login_url(self._page.url):
+                    for _ in range(2):
+                        if not _bpm_is_unauthenticated_login_url(self._page.url):
+                            break
+                        if not _try_bpm_sso_from_login_page(self._page, self.session_id):
+                            break
+                        self._page.wait_for_timeout(2000)
+                if _bpm_is_unauthenticated_login_url(self._page.url):
+                    logger.warning(
+                        f"[{self.session_id}] BPM 仍为 /login，重新进入待办链接 "
+                        f"(recovery={recovery + 1}/2)"
+                    )
+                    try:
+                        self._page.goto(entry, wait_until='domcontentloaded', timeout=60000)
+                        self._page.wait_for_timeout(2000)
+                    except Exception as e:
+                        logger.warning(f"[{self.session_id}] 重新打开待办失败: {e}")
+
+                t_end = time.time() + 120
+                while time.time() < t_end:
+                    self._extract_auth()
+                    if self._access_token and self._uid:
+                        logger.info(f"[{self.session_id}] 认证获取成功: uid={self._uid}")
+                        return True
+                    cur = self._page.url
+                    if 'bpm.cmhktry.com' in cur and not _bpm_is_unauthenticated_login_url(cur):
+                        break
+                    self._page.wait_for_timeout(500)
+                else:
+                    if recovery == 0:
+                        continue
+                    break
+
                 self._extract_auth()
                 if self._access_token and self._uid:
                     logger.info(f"[{self.session_id}] 认证获取成功: uid={self._uid}")
                     return True
+                break
+
+            # 已进入非 /login 的 BPM 或仍需等待 XHR 发 token
+            try:
+                with self._page.expect_response(
+                    lambda r: 'refresh-token' in r.url and r.status == 200,
+                    timeout=90000,
+                ):
+                    self._page.wait_for_load_state('networkidle', timeout=90000)
+            except Exception:
+                try:
+                    self._page.wait_for_load_state('networkidle', timeout=45000)
+                except Exception:
+                    self._page.wait_for_timeout(3000)
+
+            for attempt in range(180):
+                self._extract_auth()
+                if self._access_token and self._uid:
+                    logger.info(f"[{self.session_id}] 认证获取成功: uid={self._uid}")
+                    return True
+                if attempt > 0 and attempt % 20 == 0:
+                    logger.info(
+                        f"[{self.session_id}] 仍等待 token… attempt={attempt} "
+                        f"url={self._page.url!r}"
+                    )
                 self._page.wait_for_timeout(500)
-            
-            # 超时未获取到认证
-            logger.error(f"[{self.session_id}] 认证超时")
+
+            final_u = self._page.url
+            if _bpm_is_unauthenticated_login_url(final_u):
+                msg = (
+                    'BPM 仍停留在登录页 (/login)，无法获取认证。'
+                    '请在浏览器中打开 BPM 待办确认是否有「统一认证/CAS」入口；'
+                    '若账号无权限或 IdP 变更，请联系管理员。'
+                )
+            else:
+                msg = '认证超时'
+            logger.error(f"[{self.session_id}] {msg} 最终 URL={final_u!r}")
             with self._lock:
                 self.status = SessionStatus.ERROR
-                self.error = "认证超时"
+                self.error = msg
             self._persist_state()
             return False
-            
+
         except Exception as e:
             logger.error(f"[{self.session_id}] 认证失败: {e}")
             with self._lock:
                 self.status = SessionStatus.ERROR
-                self.error = f"认证失败: {e}"
+                self.error = f'认证失败: {e}'
             self._persist_state()
             return False
     

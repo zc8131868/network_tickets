@@ -328,8 +328,20 @@
                         <label for="{{ form.files.id_for_label }}" class="form-label">
                             <i class="fas fa-file-upload me-2"></i>{{ form.files.label }}
                         </label>
-                        {{ form.files }}
-                        <div class="form-text text-muted mt-1">Optional. Select one or more files (Ctrl/Cmd+click or Shift+click). Up to 25 files.</div>
+                        <div id="ticket-files-list" class="ticket-files-list">
+                            <div class="ticket-file-row d-flex gap-2 mb-2 align-items-start">
+                                <div class="flex-grow-1" style="min-width: 0;">
+                                    {{ form.files }}
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ticket-file-remove flex-shrink-0 align-self-center" style="display: none;" aria-label="Remove file" title="Remove">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-1" id="ticket-add-file">
+                            <i class="fas fa-plus me-1"></i>Add another file
+                        </button>
+                        <div class="form-text text-muted mt-1">Optional. Choose one file per row; use &ldquo;Add another file&rdquo; for more. Up to 25 files per ticket.</div>
                         {% if form.files.errors %}
                             <div class="invalid-feedback d-block">
                                 {% for error in form.files.errors %}
@@ -374,5 +386,62 @@
             </div>
         {% endif %}
     </div>
+
+    <script>
+    (function () {
+        var list = document.getElementById('ticket-files-list');
+        var addBtn = document.getElementById('ticket-add-file');
+        if (!list || !addBtn) return;
+        var maxFiles = 25;
+        function rowCount() {
+            return list.querySelectorAll('.ticket-file-row').length;
+        }
+        function syncRemoveButtons() {
+            var rows = list.querySelectorAll('.ticket-file-row');
+            var n = rows.length;
+            rows.forEach(function (row) {
+                var btn = row.querySelector('.ticket-file-remove');
+                if (btn) btn.style.display = n > 1 ? 'inline-block' : 'none';
+            });
+            addBtn.disabled = n >= maxFiles;
+        }
+        function bindRemove(row) {
+            var btn = row.querySelector('.ticket-file-remove');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                row.remove();
+                syncRemoveButtons();
+            });
+        }
+        list.querySelectorAll('.ticket-file-row').forEach(bindRemove);
+        addBtn.addEventListener('click', function () {
+            if (rowCount() >= maxFiles) return;
+            var firstInp = list.querySelector('input[type="file"][name="files"]');
+            var row = document.createElement('div');
+            row.className = 'ticket-file-row d-flex gap-2 mb-2 align-items-start';
+            var wrap = document.createElement('div');
+            wrap.className = 'flex-grow-1';
+            wrap.style.minWidth = '0';
+            var inp = document.createElement('input');
+            inp.type = 'file';
+            inp.name = 'files';
+            inp.className = 'form-control';
+            if (firstInp && firstInp.accept) inp.accept = firstInp.accept;
+            wrap.appendChild(inp);
+            var rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'btn btn-outline-secondary btn-sm ticket-file-remove flex-shrink-0 align-self-center';
+            rm.setAttribute('aria-label', 'Remove file');
+            rm.title = 'Remove';
+            rm.innerHTML = '<i class="fas fa-times"></i>';
+            row.appendChild(wrap);
+            row.appendChild(rm);
+            list.appendChild(row);
+            bindRemove(row);
+            syncRemoveButtons();
+        });
+        syncRemoveButtons();
+    })();
+    </script>
     
 {% endblock body %}

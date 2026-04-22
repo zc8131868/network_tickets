@@ -2,8 +2,8 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from auto_tickets.views.forms_ticket_management import TicketManagementForm
 from auto_tickets.models import ITSR_Network
+from auto_tickets.itsr_file_utils import delete_attachments_for_ticket_number, get_itsr_files_dir
 import os
-from django.conf import settings
 from datetime import datetime, timedelta
 import glob
 
@@ -70,11 +70,14 @@ def ticket_management(request):
                     form.add_error('itsr_ticket_number', 'This ITSR ticket number already exists in the database.')
                     return render(request, 'ticket_management.html', {'form': form})
                 
+                itsr_files_dir = get_itsr_files_dir()
+                # Drop disk files from a previous ticket with the same number (DB row was deleted)
+                delete_attachments_for_ticket_number(itsr_files_dir, itsr_ticket_number)
+                
                 # Handle one or more file uploads (optional)
                 saved_file_paths = []
                 if uploaded_files:
                     # Create itsr_files directory if it doesn't exist
-                    itsr_files_dir = os.path.join(settings.BASE_DIR, 'auto_tickets', 'itsr_files')
                     os.makedirs(itsr_files_dir, mode=0o755, exist_ok=True)
                     
                     # Check if directory is writable

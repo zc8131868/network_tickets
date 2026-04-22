@@ -4,12 +4,13 @@ from auto_tickets.models import ITSR_Network
 
 
 class MultipleFileInput(forms.FileInput):
+    """Collects uploads via getlist(name); each input is single-file (no HTML multiple)."""
+
     def __init__(self, attrs=None):
         super().__init__(attrs)
-        if self.attrs is not None:
-            self.attrs.setdefault('multiple', True)
-        else:
-            self.attrs = {'multiple': True}
+        # Intentionally no `multiple` — users add rows one file at a time in the template.
+        if self.attrs is None:
+            self.attrs = {}
 
     def value_from_datadict(self, data, files, name):
         if files is not None and hasattr(files, 'getlist'):
@@ -39,7 +40,7 @@ class MultipleFileField(forms.Field):
             value = [value]
         files = [f for f in value if f and getattr(f, 'name', None)]
         if len(files) > 25:
-            raise ValidationError('You can upload at most 25 files at once.')
+            raise ValidationError('You can attach at most 25 files per ticket.')
         return list(files)
 
 

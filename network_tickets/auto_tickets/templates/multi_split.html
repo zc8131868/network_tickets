@@ -200,6 +200,17 @@
                 <div class="card-body">
                     <form action="{% url 'multi_split' %}" method="post" enctype="multipart/form-data" id="uploadForm">
                         {% csrf_token %}
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+                        {% if form.file.errors %}
+                        <div class="alert alert-danger" role="alert">
+                            <strong>File</strong>
+                            {{ form.file.errors }}
+                        </div>
+                        {% endif %}
                         
                         <div class="upload-area" id="uploadArea">
                             <i class="fas fa-cloud-upload-alt text-primary mb-3" style="font-size: 3rem;"></i>
@@ -670,74 +681,66 @@ document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('customFileInput');
     const uploadBtn = document.getElementById('uploadBtn');
     
-    // Check if results are displayed - if so, don't initialize upload functionality
-    const resultsContainer = document.querySelector('.results-container');
-    if (resultsContainer) {
-        console.log('DEBUG: Results are displayed, skipping upload initialization');
+    // Upload card is omitted when result_list is shown; do not key off .results-container (fragile).
+    if (!uploadArea || !fileInput || !uploadBtn) {
         return;
     }
-    
-    // Only run upload functionality if the form exists (no results displayed)
-    if (uploadArea && fileInput && uploadBtn) {
-        console.log('DEBUG: Upload elements found, initializing simple file handling');
-        
-        // Simple file input change handler
-        fileInput.addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                const file = e.target.files[0];
-                console.log('DEBUG: File selected:', file.name);
-                uploadBtn.disabled = false;
-                uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File (' + file.name + ')';
-            } else {
-                uploadBtn.disabled = true;
-                uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
-            }
-        });
-        
-        // Drag and drop functionality
-        uploadArea.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragenter', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!uploadArea.contains(e.relatedTarget)) {
-                uploadArea.classList.remove('dragover');
-            }
-        });
-        
-        uploadArea.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+
+    console.log('DEBUG: Upload elements found, initializing simple file handling');
+
+    // Simple file input change handler
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            const file = e.target.files[0];
+            console.log('DEBUG: File selected:', file.name);
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File (' + file.name + ')';
+        } else {
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
+        }
+    });
+
+    // Drag and drop functionality
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragenter', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!uploadArea.contains(e.relatedTarget)) {
             uploadArea.classList.remove('dragover');
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                console.log('DEBUG: File dropped:', files[0].name);
-                fileInput.files = files;
-                
-                // Trigger the change event
-                const event = new Event('change', { bubbles: true });
-                fileInput.dispatchEvent(event);
-            }
-        });
-        
-        // Initial state
-        uploadBtn.disabled = true;
-        uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
-        
-    } else {
-        console.log('DEBUG: Upload elements not found');
-    }
+        }
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        uploadArea.classList.remove('dragover');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            console.log('DEBUG: File dropped:', files[0].name);
+            fileInput.files = files;
+
+            // Trigger the change event
+            const event = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(event);
+        }
+    });
+
+    // Initial state
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fas fa-play me-2"></i>Process File';
 });
 
 function copyResult(index) {
@@ -973,7 +976,7 @@ function pollEomsTask(taskId, attempt) {
         credentials: 'same-origin',
         headers: { 'Accept': 'application/json' },
     })
-    .then(function(resp) { return resp.json(); })
+    .then(function(resp) { return parseJsonResponse(resp); })
     .then(function(data) {
         if (!data.success) {
             _eomsPollActive = false;
@@ -1009,7 +1012,7 @@ function pollEomsTask(taskId, attempt) {
     .catch(function(err) {
         _eomsPollActive = false;
         if (closeBtn) closeBtn.style.display = '';
-        handleEomsError('Network error: ' + err.message);
+        handleEomsError(err.message || 'Request failed.');
     });
 }
 
@@ -1063,7 +1066,7 @@ function submitEomsCredentials() {
             target_department: eomsTargetDepartment,
         }),
     })
-    .then(resp => resp.json())
+    .then(resp => parseJsonResponse(resp))
     .then(data => {
         if (!data.success) {
             if (closeBtn) closeBtn.style.display = '';
@@ -1080,7 +1083,7 @@ function submitEomsCredentials() {
     })
     .catch(err => {
         if (closeBtn) closeBtn.style.display = '';
-        handleEomsError('Network error: ' + err.message);
+        handleEomsError(err.message || 'Request failed.');
     });
 }
 
@@ -1115,7 +1118,7 @@ function submitEomsCaptcha() {
             resume_token: _eomsResumeToken || '',
         }),
     })
-    .then(resp => resp.json())
+    .then(resp => parseJsonResponse(resp))
     .then(data => {
         if (!data.success) {
             if (closeBtn) closeBtn.style.display = '';
@@ -1127,7 +1130,7 @@ function submitEomsCaptcha() {
     })
     .catch(err => {
         if (closeBtn) closeBtn.style.display = '';
-        handleEomsError('Network error: ' + err.message);
+        handleEomsError(err.message || 'Request failed.');
     });
 }
 
@@ -1189,6 +1192,36 @@ function _showItsrStep(stepId) {
 function getCsrfToken() {
     const el = document.querySelector('[name=csrfmiddlewaretoken]');
     return el ? el.value : '';
+}
+
+/** Parse fetch Response as JSON; surface clear errors when server returns HTML (CSRF 403, 500 page, login, etc.). */
+function parseJsonResponse(resp) {
+    return resp.text().then(function(text) {
+        var trimmed = text.trim();
+        var ct = (resp.headers.get('content-type') || '').toLowerCase();
+        var looksJson = ct.indexOf('application/json') >= 0 ||
+            trimmed.charAt(0) === '{' || trimmed.charAt(0) === '[';
+        if (looksJson) {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                throw new Error('Server returned invalid JSON (HTTP ' + resp.status + '). Try refreshing the page.');
+            }
+        }
+        if (trimmed.indexOf('<!DOCTYPE') === 0 || trimmed.toLowerCase().indexOf('<html') !== -1) {
+            if (resp.status === 403) {
+                throw new Error('Access denied — often an expired session or CSRF token. Refresh the page and try again.');
+            }
+            if (resp.status === 404) {
+                throw new Error('API not found (HTTP 404). If Netcare is under a URL prefix, the app may need a configured base path.');
+            }
+            if (resp.status >= 500) {
+                throw new Error('Server error (HTTP ' + resp.status + '). Check application logs or try again later.');
+            }
+            throw new Error('Server returned a web page instead of JSON (HTTP ' + resp.status + '). Refresh the page and try again.');
+        }
+        throw new Error('Unexpected response from server (HTTP ' + resp.status + ').');
+    });
 }
 
 function openItsrModal() {
@@ -1277,7 +1310,7 @@ function submitItsrCredentials() {
         },
         body: JSON.stringify({ username: username, password: password }),
     })
-    .then(resp => resp.json())
+    .then(resp => parseJsonResponse(resp))
     .then(data => {
         if (data.success) {
             if (data.needs_sms) {
@@ -1295,7 +1328,7 @@ function submitItsrCredentials() {
         }
     })
     .catch(err => {
-        handleItsrError('Network error: ' + err.message);
+        handleItsrError(err.message || 'Request failed.');
     });
 }
 
@@ -1324,7 +1357,7 @@ function submitItsrSms() {
         },
         body: JSON.stringify({ session_id: itsrSessionId, sms_code: smsCode }),
     })
-    .then(resp => resp.json())
+    .then(resp => parseJsonResponse(resp))
     .then(data => {
         if (data.success) {
             handleItsrSuccess(data);
@@ -1333,7 +1366,7 @@ function submitItsrSms() {
         }
     })
     .catch(err => {
-        handleItsrError('Network error: ' + err.message);
+        handleItsrError(err.message || 'Request failed.');
     });
 }
 
